@@ -30,6 +30,9 @@ kickertool-application          Use Cases (port.in), Ports (port.out), Anwendung
 kickertool-adapter-rest         eingehend: REST-API, OIDC-Absicherung als Resource Server, SSE
 kickertool-adapter-persistence  ausgehend: JPA + PostgreSQL + Flyway
 kickertool-adapter-events       ausgehend: Verteilung der Live-Update-Events (In-Memory, austauschbar)
+kickertool-local                nur für lokale Tests: simulierter OIDC-Provider, Testnutzer, Demo-Turnier (nur mit Profil "local")
+Dockerfile, docker-compose.yml  Container-Image und Entwicklungsumgebung mit Docker
+helm/kickertool                 Helm-Chart: App, PostgreSQL und Keycloak im Kubernetes-Cluster
 kickertool-bootstrap            startbare Spring-Boot-App, verdrahtet alles
 ```
 
@@ -45,6 +48,7 @@ Registrierung und Login übernimmt der OIDC-Provider. Die API ist ein **Resource
 | Claim mit den Rollen | `KICKERTOOL_ADMIN_CLAIM` | `realm_access.roles` |
 | Rolle, die zum Admin macht | `KICKERTOOL_ADMIN_ROLE` | `kicker-admin` |
 | Datenbank | `KICKERTOOL_DB_URL`, `_USER`, `_PASSWORD` | lokales Postgres, `kickertool` |
+| Swagger UI und OpenAPI-Doku | `KICKERTOOL_OPENAPI_ENABLED` | `true` (in Produktion `false`) |
 
 Der Claim-Pfad darf verschachtelt sein (`resource_access.<client>.roles`), eine Zeichenkette wird an Leerzeichen getrennt. Damit läuft die App mit jedem OIDC-Provider, der JWT-Access-Tokens ausstellt.
 
@@ -66,6 +70,94 @@ curl -s -d "client_id=kickertool-app" -d "grant_type=password" -d "username=anna
 
 Danach `Authorization: Bearer <access_token>` an jede Anfrage hängen. Die Testnutzer und `redirectUris: *` gelten nur für die lokale Entwicklung.
 
+## API ausprobieren (Swagger UI)
+
+Mit laufender App (und Keycloak) gibt es eine interaktive Dokumentation:
+
+| | |
+|---|---|
+| Swagger UI | http://localhost:8080/swagger-ui.html |
+| OpenAPI (JSON) | http://localhost:8080/v3/api-docs |
+
+**Anmelden in Swagger UI:** Oben rechts **Authorize** wählen.
+- `oidc`: Login über Keycloak. Mit dem Flow *password* genügt `anna` / `anna` (oder `admin` / `admin` für Admin-Endpunkte) und die `client_id` `kickertool-app` ohne Secret. Das Token wird gemerkt, auch nach dem Neuladen der Seite.
+- `bearerAuth`: ein fertiges Access-Token einfügen (siehe Token holen oben).
+
+Dann bei einem Endpunkt **Try it out**. Typischer Ablauf zum Ausprobieren: als `admin` `POST /api/tournaments` (Turnier planen), als `anna` und `ben` `POST …/participants` (anmelden), als `admin` `…/start` und `…/rounds`, dann `GET …/matches/mine`. Mit einem zweiten Browserfenster oder einem Token pro Nutzer lassen sich Ergebnis eintragen und bestätigen nachspielen.
+
+Der Live-Update-Stream (`…/events`) lässt sich in Swagger UI nicht darstellen, dafür `curl -N -H "Authorization: Bearer <token>" http://localhost:8080/api/tournaments/<id>/events` nutzen.
+
+Die Doku ist öffentlich lesbar, die Aufrufe der API selbst brauchen ein Token. In Produktion mit `KICKERTOOL_OPENAPI_ENABLED=false` abschalten.
+## Lokal ohne Docker (H2 und simulierter Keycloak)
+
+Zum schnellen Ausprobieren braucht es weder Postgres noch Keycloak. Das Maven-Profil `local` startet die App mit H2 im Speicher und einem **simulierten OIDC-Provider** in der App selbst (`/mock-oidc`), dazu ein Demo-Turnier:
+
+```powershell
+.\scripts\run-local.ps1
+```
+
+(Linux/macOS: `./scripts/run-local.sh`.) Das Skript installiert alle Module und startet `.\mvnw.cmd -pl kickertool-bootstrap -Plocal spring-boot:run`. In IntelliJ: Maven-Profil `local` aktivieren und die Spring-Profile `local` setzen.
+
+Danach ist alles unter http://localhost:8080/swagger-ui.html erreichbar:
+
+- **Anmelden:** **Authorize**, dann `oidc` (Password-Flow), Benutzername = Passwort. Die `client_id` ist vorbelegt, ein Secret ist nicht nötig.
+- **Benutzer:** `admin` (Admin-Rechte) und die Spieler `anna`, `ben`, `clara`, `david`, `emma`, `felix`, `greta`, `hans`, `ida`, `jonas`.
+- **Demo-Turnier:** "Demo-Turnier" mit allen 10 Spielern angemeldet, 3 Tische, noch nicht gestartet. Als `admin` `…/start` und `…/rounds` aufrufen, dann als Spieler `…/matches/mine`, Ergebnis eintragen und als Gegner bestätigen. Für den Wechsel zwischen Spielern erneut **Authorize** (erst **Logout**).
+- **Tokens per Hand:** `curl -d "grant_type=password&username=anna&password=anna" http://localhost:8080/mock-oidc/token`
+- Die Datenbank liegt im Speicher, nach jedem Neustart ist alles frisch. Die Tokens gelten nur bis zum nächsten Neustart.
+
+**Nur lokal!** Der simulierte Provider lässt jeden als Admin herein. Er steckt im Modul `kickertool-local`, das nur mit dem Maven-Profil `local` und dem Spring-Profil `local` aktiv wird und nie im Produktions-Jar landet.
+## Docker und Kubernetes
+
+### Container-Image
+
+```bash
+docker build -t kickertool:0.1.0-SNAPSHOT .
+```
+
+Mehrstufiger Build: Maven baut die App (ohne Tests, die laufen in der CI), das Spring-Boot-Jar wird in Schichten zerlegt (Abhängigkeiten ändern sich selten, das spart beim erneuten Bau und Übertragen), und das Laufzeit-Image enthält nur ein JRE 21. Es läuft ohne Root (UID 10001), richtet den Speicher nach dem Limit des Containers aus (`JAVA_TOOL_OPTIONS`) und enthält weder den simulierten Login noch H2. Gesund ist die App, wenn `/actuator/health/liveness` bzw. `/actuator/health/readiness` melden. Konfiguriert wird sie über die Umgebungsvariablen aus der Tabelle oben, zusätzlich `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI`, falls der Aussteller aus dem Container nicht erreichbar ist (siehe unten).
+
+### Docker Compose
+
+```bash
+docker compose --profile app up -d --build    # App, PostgreSQL und Keycloak
+docker compose up -d                          # nur PostgreSQL und Keycloak, die App läuft dann in der IDE
+```
+
+Danach Swagger UI unter http://localhost:8080/swagger-ui.html, Login mit dem Keycloak-Realm (`anna`/`anna`, `admin`/`admin`). Die Ports 8080, 5432 und 8180 müssen frei sein. **Windows:** Läuft die App zusätzlich in der IDE auf 8080, antwortet auf `localhost:8080` diese statt des Containers. Dann zuerst die IDE-Instanz beenden.
+
+Der Aussteller im Token ist die Adresse, unter der der Browser Keycloak erreicht (`http://localhost:8180/...`). Aus dem App-Container ist Keycloak aber unter `keycloak:8180` erreichbar, deshalb holt die App die Schlüssel von dort (`JWK_SET_URI`) und prüft den Aussteller gegen die Browser-Adresse. Dasselbe Muster nutzt das Helm-Chart.
+
+### Helm-Chart (Kubernetes)
+
+`helm/kickertool` bringt alles mit: die App, eine PostgreSQL-Instanz (StatefulSet mit Datenträger) und Keycloak mit importiertem Realm. Keine fremden Subcharts. Zum Ausprobieren auf einem lokalen Cluster (Rancher Desktop, kind, minikube):
+
+```bash
+docker build -t kickertool:0.1.0-SNAPSHOT .          # das Image muss dem Cluster bekannt sein (bei Rancher Desktop mit dockerd automatisch)
+helm install kt helm/kickertool -n kickertool --create-namespace -f helm/kickertool/values-local.yaml
+kubectl -n kickertool port-forward svc/kt-kickertool-keycloak 8180:8080    # Terminal 1
+kubectl -n kickertool port-forward svc/kt-kickertool 8080:8080             # Terminal 2
+```
+
+Dann http://localhost:8080/swagger-ui.html, Anmeldung mit `anna`/`anna` (Password-Flow, nur wegen `values-local.yaml`). Aufräumen: `helm uninstall kt -n kickertool` und `kubectl delete namespace kickertool` (löscht auch den Datenträger). `helm test kt -n kickertool` prüft die Erreichbarkeit der App.
+
+**Wichtige Einstellungen** (alle in `values.yaml` beschrieben):
+
+| Wert | Bedeutung |
+|---|---|
+| `image.repository`, `image.tag` | Das Image. `tag` leer = Version des Charts |
+| `keycloak.hostname` | Externe Adresse von Keycloak, wie der Browser sie aufruft. Daraus wird der Aussteller (`iss`) im Token. Muss zur echten Adresse passen, sonst weist die App Tokens ab |
+| `keycloak.redirectUris`, `webOrigins` | Erlaubte Rückleitungen nach dem Login (z. B. Swagger UI, später die App) |
+| `ingress.*` | Zugang von außen mit `host` für die App und `keycloakHost` für Keycloak, dazu `keycloak.proxyHeaders: xforwarded` |
+| `postgresql.enabled=false` + `database.*` | Eigene oder verwaltete Datenbank statt der eingebauten |
+| `keycloak.enabled=false` + `oidc.issuerUri` | Eigener OIDC-Provider statt Keycloak |
+| `app.openapi` | Swagger UI und API-Doku an oder aus |
+
+**Admin-Rechte** bekommt, wem in Keycloak die Realm-Rolle `kicker-admin` zugewiesen ist (Admin-Konsole unter `keycloak.hostname`, Passwort steht im Secret, siehe Ausgabe von `helm install`).
+
+**Für eine echte Umgebung:** HTTPS über den Ingress und `keycloak.sslRequired: external`, `demoUsers` und `directAccessGrants` aus, `redirectUris` ohne Platzhalter, Passwörter über `existingSecret` oder zufällig erzeugen lassen (leere Werte), `app.openapi: false`. Die eingebaute PostgreSQL ist eine einfache Einzelinstanz ohne Backup, besser eine verwaltete Datenbank mit `postgresql.enabled=false`. `replicaCount` bei 1 lassen, weil die Live-Updates im Speicher der Instanz verteilt werden. Mehrere Replikas bräuchten einen anderen `TournamentEventBus`-Adapter (z. B. Redis).
+
+**Geprüft:** Image-Bau, Compose-Stack mit echtem Keycloak und PostgreSQL (Realm-Import, Login, Admin-Rolle, 401/403), Helm-Lint und Server-Dry-Run, Installation auf einem k3s-Cluster mit Login, Turnier anlegen und Anmelden, Neustart von PostgreSQL ohne Datenverlust, `helm test`. **Nicht geprüft:** Ingress, TLS und ein Betrieb hinter einem Reverse Proxy.
 ## REST-API
 
 Alle Endpunkte liegen unter `/api` und verlangen ein Token. Fehler kommen als `application/problem+json`:

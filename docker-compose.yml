@@ -1,6 +1,12 @@
-# Lokale Entwicklungsumgebung: PostgreSQL und Keycloak als OIDC-Provider.
-# Starten:  docker compose up -d
-# Danach:   .\mvnw.cmd -pl kickertool-bootstrap spring-boot:run
+# Entwicklungsumgebung mit Docker.
+#
+# Nur die Abhängigkeiten (Postgres und Keycloak), die App läuft dann z. B. in der IDE:
+#   docker compose up -d
+#   .\mvnw.cmd -pl kickertool-bootstrap spring-boot:run
+#
+# Alles zusammen, die App als Container (wird dafür gebaut):
+#   docker compose --profile app up -d --build
+#   -> Swagger UI: http://localhost:8080/swagger-ui.html, Login-Beispiel: anna / anna
 services:
   postgres:
     image: postgres:17-alpine
@@ -29,6 +35,26 @@ services:
       - "8180:8180"
     volumes:
       - ./docker/keycloak/kickertool-realm.json:/opt/keycloak/data/import/kickertool-realm.json:ro
+
+  app:
+    profiles: ["app"]
+    build: .
+    image: kickertool:0.1.0-SNAPSHOT
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      KICKERTOOL_DB_URL: jdbc:postgresql://postgres:5432/kickertool
+      KICKERTOOL_DB_USER: kickertool
+      KICKERTOOL_DB_PASSWORD: kickertool
+      # Der Aussteller im Token ist die Adresse, unter der der Browser Keycloak erreicht.
+      KICKERTOOL_OIDC_ISSUER_URI: http://localhost:8180/realms/kickertool
+      # Im Container ist Keycloak aber unter seinem Dienstnamen erreichbar, von dort kommen die Schlüssel.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/kickertool/protocol/openid-connect/certs
+    ports:
+      - "8080:8080"
 
 volumes:
   postgres-data:

@@ -24,12 +24,14 @@
         <module>kickertool-adapter-persistence</module>
         <module>kickertool-adapter-events</module>
         <module>kickertool-adapter-rest</module>
+        <module>kickertool-local</module>
         <module>kickertool-bootstrap</module>
     </modules>
 
     <properties>
         <java.version>21</java.version>
         <archunit.version>1.5.1</archunit.version>
+        <springdoc.version>3.1.1</springdoc.version>
     </properties>
 
     <dependencyManagement>
@@ -58,6 +60,16 @@
                 <groupId>zur.koeln</groupId>
                 <artifactId>kickertool-adapter-rest</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>zur.koeln</groupId>
+                <artifactId>kickertool-local</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.tngtech.archunit</groupId>

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "kickertool.fullname" . }}-test
+  labels:
+    {{- include "kickertool.labels" (dict "ctx" . "component" "test") | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: health
+      image: busybox:1.37
+      command:
+        - sh
+        - -c
+        - |
+          wget -qO- http://{{ include "kickertool.fullname" . }}:{{ .Values.service.port }}/actuator/health/readiness
+          wget -q -O /dev/null http://{{ include "kickertool.fullname" . }}:{{ .Values.service.port }}/v3/api-docs || [ "{{ .Values.app.openapi }}" = "false" ]

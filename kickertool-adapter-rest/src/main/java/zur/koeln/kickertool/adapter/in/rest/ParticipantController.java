@@ -2,6 +2,9 @@ package zur.koeln.kickertool.adapter.in.rest;
 
 import java.util.UUID;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
@@ -28,9 +31,11 @@ import zur.koeln.kickertool.domain.tournament.TournamentId;
  */
 @RestController
 @RequestMapping("/api/tournaments/{tournamentId}/participants")
+@Tag(name = "Teilnahme", description = "Anmeldung, Pause und Ausscheiden. Spieler verwalten nur sich selbst, Admins jeden.")
 class ParticipantController {
 
     private static final String ME = "me";
+    private static final String PLAYER_ID_HELP = "Spieler-ID oder `me` für den Aufrufer";
 
     private final ParticipationUseCase participation;
 
@@ -38,7 +43,10 @@ class ParticipantController {
         this.participation = participation;
     }
 
-    /** Meldet an. Ohne Body oder {@code playerId} meldet sich der Aufrufer selbst an. */
+    @Operation(summary = "Zum Turnier anmelden",
+            description = "Ohne Body meldet sich der Aufrufer selbst an. Ein Admin kann mit `playerId` einen anderen "
+                    + "bekannten Spieler anmelden. Möglich bis zum Turnierende, wer nach dem Start kommt, spielt ab "
+                    + "der nächsten Runde mit. Doppelte Anmeldung ergibt 409.")
     @PostMapping
     ResponseEntity<Responses.Tournament> register(Actor actor, @PathVariable UUID tournamentId,
             @RequestBody(required = false) Requests.Register request) {
@@ -49,19 +57,21 @@ class ParticipantController {
         return ResponseEntity.status(HttpStatus.CREATED).body(RestMapper.tournament(view));
     }
 
-    /** Meldet ab, nur vor dem Start des Turniers. */
+    @Operation(summary = "Vom Turnier abmelden", description = "Nur vor dem Start. Danach gibt es nur Pause oder Ausscheiden.")
     @DeleteMapping("/{playerId}")
-    Responses.Tournament unregister(Actor actor, @PathVariable UUID tournamentId, @PathVariable String playerId) {
+    Responses.Tournament unregister(Actor actor, @PathVariable UUID tournamentId,
+            @Parameter(description = PLAYER_ID_HELP) @PathVariable String playerId) {
         return RestMapper.tournament(
                 participation.unregister(actor, new TournamentId(tournamentId), resolve(playerId, actor)));
     }
 
-    /**
-     * Setzt den Teilnahmestatus: {@code PAUSED} (ab nächster Runde pausieren), {@code ACTIVE} (wieder einsteigen)
-     * oder {@code WITHDRAWN} (ausscheiden, Punkte bleiben erhalten).
-     */
+    @Operation(summary = "Teilnahmestatus ändern",
+            description = "`PAUSED`: ab der nächsten Runde nicht mehr zugelost (die laufende Runde wird normal "
+                    + "gespielt). `ACTIVE`: wieder einsteigen. `WITHDRAWN`: ausscheiden, die Punkte bleiben "
+                    + "erhalten, eine Rückkehr ist nicht möglich.")
     @PutMapping("/{playerId}/status")
-    Responses.Tournament changeStatus(Actor actor, @PathVariable UUID tournamentId, @PathVariable String playerId,
+    Responses.Tournament changeStatus(Actor actor, @PathVariable UUID tournamentId,
+            @Parameter(description = PLAYER_ID_HELP) @PathVariable String playerId,
             @Valid @RequestBody Requests.ChangeParticipantStatus request) {
         TournamentId tournament = new TournamentId(tournamentId);
         PlayerId player = resolve(playerId, actor);

@@ -10,9 +10,12 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>kickertool-adapter-rest</artifactId>
-    <name>kickertool-adapter-rest</name>
-    <description>Eingehender Adapter: REST-API und OIDC-Absicherung (Resource Server)</description>
+    <artifactId>kickertool-local</artifactId>
+    <name>kickertool-local</name>
+    <description>
+        Nur für lokale Tests: simulierter OIDC-Provider, Testnutzer und Demo-Turnier.
+        Wird vom Bootstrap-Modul nur mit dem Maven-Profil "local" eingebunden und gehört nie in ein Produktions-Jar.
+    </description>
 
     <dependencies>
         <dependency>
@@ -27,24 +30,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-        <!-- OpenAPI-Dokumentation und Swagger UI -->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

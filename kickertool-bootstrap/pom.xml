@@ -40,6 +40,13 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- nur für Tests und mit dem Maven-Profil "local", nie im Produktions-Jar -->
+        <dependency>
+            <groupId>zur.koeln</groupId>
+            <artifactId>kickertool-local</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
@@ -76,6 +83,31 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!--
+            Lokaler Testmodus ohne Docker: H2 im Speicher und simulierter OIDC-Provider.
+            Start: ./mvnw -pl kickertool-bootstrap -Plocal spring-boot:run
+        -->
+        <profile>
+            <id>local</id>
+            <properties>
+                <spring-boot.run.profiles>local</spring-boot.run.profiles>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>zur.koeln</groupId>
+                    <artifactId>kickertool-local</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.h2database</groupId>
+                    <artifactId>h2</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

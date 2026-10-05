@@ -1,0 +1,42 @@
+Kickertool {{ .Chart.AppVersion }} wurde als "{{ .Release.Name }}" in "{{ .Release.Namespace }}" installiert.
+
+{{- if .Values.ingress.enabled }}
+
+Erreichbar über den Ingress:
+  App:        http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+  Swagger UI: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}/swagger-ui.html
+{{- if and .Values.keycloak.enabled .Values.ingress.keycloakHost }}
+  Keycloak:   {{ .Values.keycloak.hostname }}  (ingress.keycloakHost: {{ .Values.ingress.keycloakHost }})
+{{- end }}
+{{- else }}
+
+Ohne Ingress, lokal per port-forward (in zwei Terminals):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kickertool.fullname" . }} 8080:{{ .Values.service.port }}
+{{- if .Values.keycloak.enabled }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kickertool.keycloakName" . }} 8180:8080
+{{- end }}
+Dann: http://localhost:8080/swagger-ui.html
+{{- end }}
+
+{{- if .Values.keycloak.enabled }}
+
+Keycloak
+  Aussteller im Token: {{ include "kickertool.issuerUri" . }}
+  Dieser Wert muss genau der Adresse entsprechen, unter der Clients Keycloak aufrufen (keycloak.hostname).
+  Admin-Konsole:       {{ .Values.keycloak.hostname }}  Benutzer "{{ .Values.keycloak.adminUser }}", Passwort:
+    kubectl -n {{ .Release.Namespace }} get secret {{ include "kickertool.keycloakName" . }} -o jsonpath='{.data.admin-password}' | base64 -d
+  Admin-Rechte in der App: dem Benutzer in Keycloak die Realm-Rolle "{{ .Values.app.adminRole }}" geben.
+{{- if .Values.keycloak.demoUsers }}
+
+ACHTUNG: keycloak.demoUsers=true legt die Benutzer admin, anna und ben mit dem Passwort = Benutzername an.
+Nur für lokale Tests, nie in einer echten Umgebung!
+{{- end }}
+{{- if and (.Values.keycloak.redirectUris) (has "*" .Values.keycloak.redirectUris) }}
+
+ACHTUNG: keycloak.redirectUris enthält "*". Nur für Tests.
+{{- end }}
+{{- end }}
+{{- if gt (int .Values.replicaCount) 1 }}
+
+HINWEIS: replicaCount > 1. Live-Updates (SSE) werden nicht zwischen den Instanzen verteilt.
+{{- end }}

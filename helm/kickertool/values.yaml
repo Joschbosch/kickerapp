@@ -1,0 +1,126 @@
+# Standardwerte für das Kickertool-Chart.
+# Ohne Änderungen läuft alles im Cluster: die App, PostgreSQL und Keycloak. Für den Zugriff von außen siehe `ingress`
+# und `keycloak.hostname`. Zum schnellen Ausprobieren mit port-forward: `-f values-local.yaml`.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: kickertool
+  # leer = appVersion aus Chart.yaml
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Die App hält Live-Update-Verbindungen (SSE) im Speicher der Instanz. Mehrere Replikas verteilen Events nicht
+# untereinander, Clients bekämen dann nur die Updates der Instanz, mit der sie verbunden sind. Bei 1 lassen.
+replicaCount: 1
+
+app:
+  # Swagger UI und OpenAPI-Beschreibung (/swagger-ui.html, /v3/api-docs). In Produktion besser abschalten.
+  openapi: true
+  # Wo im Token steht, ob jemand Admin ist. Die Defaults passen zu Keycloak-Realm-Rollen.
+  adminClaim: realm_access.roles
+  adminRole: kicker-admin
+  # Weitere Umgebungsvariablen, z. B. - {name: LOGGING_LEVEL_ZUR_KOELN, value: DEBUG}
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 768Mi
+
+# Aussteller des OIDC-Providers. Nur nötig, wenn keycloak.enabled=false (eigener Provider).
+oidc:
+  # Aussteller, muss zum `iss` im Token passen
+  issuerUri: ""
+  # Optional: Adresse der Schlüssel, falls der Aussteller aus dem Cluster nicht erreichbar ist
+  jwkSetUri: ""
+
+# Eigene Datenbank. Nur nötig, wenn postgresql.enabled=false.
+database:
+  url: ""
+  username: ""
+  password: ""
+  # Alternativ ein vorhandenes Secret mit dem Schlüssel "password"
+  existingSecret: ""
+
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 17-alpine
+  database: kickertool
+  username: kickertool
+  # leer = zufällig erzeugen und bei Upgrades behalten
+  password: ""
+  # Alternativ ein vorhandenes Secret mit dem Schlüssel "password"
+  existingSecret: ""
+  storage:
+    size: 2Gi
+    # leer = Standard-StorageClass des Clusters
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.0"
+  # Externe Adresse von Keycloak, so wie der Browser sie aufruft. Daraus wird der Aussteller (`iss`) im Token. Die App
+  # holt die Schlüssel trotzdem über den Cluster-Dienst, sie muss die externe Adresse nicht erreichen können.
+  hostname: "http://localhost:8180"
+  realm: kickertool
+  clientId: kickertool-app
+  # Erlaubte Rückleitungen nach dem Login (Swagger UI und künftige Clients). Keine Platzhalter-Adressen in Produktion.
+  redirectUris:
+    - "http://localhost:8080/*"
+  webOrigins:
+    - "http://localhost:8080"
+  # "none" nur für lokale Tests ohne HTTPS, sonst "external"
+  sslRequired: none
+  # Spieler können sich selbst registrieren
+  registrationAllowed: true
+  # Password-Flow (Benutzername und Passwort direkt an den Token-Endpunkt). Nur für Tests, z. B. Swagger UI ohne Browser-Login.
+  directAccessGrants: false
+  # Testnutzer admin, anna und ben (Passwort = Benutzername). Nur für lokale Tests!
+  demoUsers: false
+  adminUser: admin
+  # leer = zufällig erzeugen und bei Upgrades behalten
+  adminPassword: ""
+  # Datenbank für Keycloak in derselben PostgreSQL-Instanz
+  database: keycloak
+  # Hinter einem Ingress auf "xforwarded" setzen
+  proxyHeaders: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 768Mi
+    limits:
+      memory: 1Gi
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  # Für Server-Sent Events hinter nginx: proxy-buffering "off" und ein langes proxy-read-timeout
+  # annotations:
+  #   nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  annotations: {}
+  # Host der App
+  host: ""
+  # Host von Keycloak, leer = nicht über den Ingress erreichbar
+  keycloakHost: ""
+  tls: []
+  #  - secretName: kickertool-tls
+  #    hosts: [kickertool.example.com, auth.example.com]

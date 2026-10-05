@@ -1,0 +1,14 @@
+# Lokaler Testmodus (Spring-Profil "local"): H2 im Speicher und simulierter OIDC-Provider in der App.
+spring:
+  datasource:
+    url: jdbc:h2:mem:kickertool-local;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Nur für die Swagger-UI-Anmeldung (Discovery). Die Tokens prüft die App direkt mit dem Schlüssel des
+          # simulierten Providers.
+          issuer-uri: http://localhost:${server.port:8080}/mock-oidc

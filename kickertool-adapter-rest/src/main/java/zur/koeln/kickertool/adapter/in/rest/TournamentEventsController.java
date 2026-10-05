@@ -8,6 +8,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import zur.koeln.kickertool.adapter.in.rest.dto.Responses;
 import zur.koeln.kickertool.application.event.TournamentEvent;
 import zur.koeln.kickertool.application.port.in.TournamentEventUseCase;
 import zur.koeln.kickertool.application.port.out.EventSubscription;
@@ -32,6 +38,7 @@ import zur.koeln.kickertool.domain.tournament.TournamentId;
  */
 @RestController
 @RequestMapping("/api/tournaments/{tournamentId}/events")
+@Tag(name = "Live-Updates", description = "Änderungen eines Turniers als Server-Sent Events")
 class TournamentEventsController implements DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(TournamentEventsController.class);
@@ -51,6 +58,14 @@ class TournamentEventsController implements DisposableBean {
         heartbeat.scheduleAtFixedRate(this::sendHeartbeat, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
     }
 
+    @Operation(summary = "Live-Updates abonnieren",
+            description = "Server-Sent Events. Sendet `connected` und danach bei Änderungen die Events "
+                    + "`TOURNAMENT_CHANGED`, `PARTICIPANTS_CHANGED`, `ROUND_STARTED`, `MATCHES_CHANGED` und "
+                    + "`RANKING_CHANGED` (JSON mit `type`, `matchId`, `occurredAt`, ohne Nutzdaten). Clients laden "
+                    + "danach den neuen Stand über die normalen Endpunkte. Braucht den Authorization-Header, in "
+                    + "Swagger UI nicht darstellbar, lokal z. B. mit `curl -N -H \"Authorization: Bearer ...\"`.")
+    @ApiResponse(responseCode = "200", description = "Dauerhafte Verbindung mit Events",
+            content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE, schema = @Schema(implementation = Responses.Event.class)))
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter stream(@PathVariable UUID tournamentId) throws IOException {
         SseEmitter emitter = new SseEmitter(TIMEOUT_MILLIS);

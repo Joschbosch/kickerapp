@@ -3,6 +3,8 @@ package zur.koeln.kickertool.adapter.in.rest;
 import java.util.List;
 import java.util.UUID;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +27,8 @@ import zur.koeln.kickertool.domain.tournament.TournamentId;
 
 @RestController
 @RequestMapping("/api/tournaments/{tournamentId}/matches")
+@Tag(name = "Matches und Ergebnisse",
+        description = "Ein Team trägt das Ergebnis ein, das Gegnerteam bestätigt. Lehnt es ab, entscheidet der Admin.")
 class MatchController {
 
     private final TournamentQueries queries;
@@ -35,7 +39,9 @@ class MatchController {
         this.results = results;
     }
 
-    /** Die Matches des Aufrufers in diesem Turnier (auch als Einspringer), in Reihenfolge der Runden. */
+    @Operation(summary = "Meine Matches",
+            description = "Alle Matches des Aufrufers in diesem Turnier, auch als Einspringer, in Reihenfolge der "
+                    + "Runden. Zeigt Tisch und Status, also ob und wo man gerade spielen soll.")
     @GetMapping("/mine")
     List<Responses.Match> mine(Actor actor, @PathVariable UUID tournamentId) {
         TournamentView view = queries.getTournament(new TournamentId(tournamentId));
@@ -46,12 +52,16 @@ class MatchController {
                 .toList();
     }
 
+    @Operation(summary = "Ein Match abrufen")
     @GetMapping("/{matchId}")
     Responses.Match get(@PathVariable UUID tournamentId, @PathVariable UUID matchId) {
         return matchOf(queries.getTournament(new TournamentId(tournamentId)), matchId);
     }
 
-    /** Ein Spieler des Matches trägt das Ergebnis ein. Das Gegnerteam muss es bestätigen. */
+    @Operation(summary = "Ergebnis eintragen",
+            description = "Ein Spieler des Matches (auch ein Einspringer) trägt den Endstand ein. Das Match muss am "
+                    + "Tisch spielen. Das Ergebnis zählt erst, wenn das Gegnerteam es bestätigt. Kein Team darf "
+                    + "mehr Tore als das Limit haben, und beide zusammen dürfen das Limit nicht erreichen (400).")
     @PostMapping("/{matchId}/result-proposal")
     Responses.Match propose(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId,
             @Valid @RequestBody Requests.Result request) {
@@ -59,19 +69,26 @@ class MatchController {
                 request.toDomain()), matchId);
     }
 
-    /** Ein Spieler des Gegnerteams bestätigt das Ergebnis. */
+    @Operation(summary = "Ergebnis bestätigen",
+            description = "Ein Spieler des **gegnerischen** Teams bestätigt das eingetragene Ergebnis. Das "
+                    + "eintragende Team kann nicht selbst bestätigen (403).")
     @PostMapping("/{matchId}/result-proposal/confirmation")
     Responses.Match confirm(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId) {
         return matchOf(results.confirmResult(actor, new TournamentId(tournamentId), new MatchId(matchId)), matchId);
     }
 
-    /** Ein Spieler des Gegnerteams lehnt das Ergebnis ab. Der Admin entscheidet dann. */
+    @Operation(summary = "Ergebnis ablehnen",
+            description = "Ein Spieler des gegnerischen Teams lehnt das Ergebnis ab. Das Match hat dann den Status "
+                    + "`DISPUTED`, der Admin legt das Ergebnis fest.")
     @PostMapping("/{matchId}/result-proposal/rejection")
     Responses.Match reject(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId) {
         return matchOf(results.rejectResult(actor, new TournamentId(tournamentId), new MatchId(matchId)), matchId);
     }
 
-    /** Nur für Admins: legt das Ergebnis fest oder korrigiert es, auch nachträglich. */
+    @Operation(summary = "Ergebnis als Admin festlegen oder korrigieren",
+            description = "**Nur Admin.** Legt das Ergebnis eines Matches fest, das gespielt wird oder wurde, und "
+                    + "bestätigt es sofort. Auch bestätigte Ergebnisse lassen sich nachträglich ändern, die "
+                    + "Rangliste rechnet sich neu.")
     @PutMapping("/{matchId}/result")
     Responses.Match decide(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId,
             @Valid @RequestBody Requests.Result request) {

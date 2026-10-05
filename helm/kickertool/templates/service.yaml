@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kickertool.fullname" . }}
+  labels:
+    {{- include "kickertool.labels" (dict "ctx" . "component" "app") | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+  selector:
+    {{- include "kickertool.selectorLabels" (dict "ctx" . "component" "app") | nindent 4 }}

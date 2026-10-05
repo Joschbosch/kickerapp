@@ -1,0 +1,14 @@
+# Für einen lokalen Cluster (z. B. Rancher Desktop), erreicht per port-forward:
+#   kubectl port-forward svc/<release>-kickertool 8080:8080
+#   kubectl port-forward svc/<release>-kickertool-keycloak 8180:8080
+#
+# Nur für lokale Tests: Testnutzer mit schwachen Passwörtern und ohne HTTPS.
+keycloak:
+  hostname: "http://localhost:8180"
+  redirectUris:
+    - "http://localhost:8080/*"
+  webOrigins:
+    - "http://localhost:8080"
+  sslRequired: none
+  directAccessGrants: true
+  demoUsers: true

@@ -1,0 +1,109 @@
+{{- if and .Values.keycloak.enabled (not .Values.postgresql.enabled) }}
+{{- fail "keycloak.enabled=true braucht postgresql.enabled=true: Keycloak legt seine Daten in derselben PostgreSQL-Instanz ab." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kickertool.fullname" . }}
+  labels:
+    {{- include "kickertool.labels" (dict "ctx" . "component" "app") | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kickertool.selectorLabels" (dict "ctx" . "component" "app") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kickertool.selectorLabels" (dict "ctx" . "component" "app") | nindent 8 }}
+      annotations:
+        # Bei geänderter Konfiguration die Pods neu starten
+        checksum/config: {{ toJson .Values.app | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if .Values.postgresql.enabled }}
+      initContainers:
+        - name: wait-for-database
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          # Läuft mit der Benutzer-ID des Pods, die im Postgres-Image keinen Namen hat. Ohne PGUSER bricht pg_isready ab.
+          env:
+            - name: PGUSER
+              value: {{ .Values.postgresql.username | quote }}
+          command: ["sh", "-c", "until pg_isready -h {{ include "kickertool.postgresqlName" . }} -p 5432; do echo 'Warte auf die Datenbank'; sleep 2; done"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      {{- end }}
+      containers:
+        - name: kickertool
+          image: {{ include "kickertool.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KICKERTOOL_DB_URL
+              value: {{ include "kickertool.dbUrl" . | quote }}
+            - name: KICKERTOOL_DB_USER
+              value: {{ include "kickertool.dbUser" . | quote }}
+            - name: KICKERTOOL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kickertool.dbSecretName" . }}
+                  key: password
+            - name: KICKERTOOL_OIDC_ISSUER_URI
+              value: {{ include "kickertool.issuerUri" . | quote }}
+            {{- with (include "kickertool.jwkSetUri" .) }}
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+              value: {{ . | quote }}
+            {{- end }}
+            - name: KICKERTOOL_ADMIN_CLAIM
+              value: {{ .Values.app.adminClaim | quote }}
+            - name: KICKERTOOL_ADMIN_ROLE
+              value: {{ .Values.app.adminRole | quote }}
+            - name: KICKERTOOL_OPENAPI_ENABLED
+              value: {{ .Values.app.openapi | quote }}
+            - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+              value: "true"
+            {{- with .Values.app.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

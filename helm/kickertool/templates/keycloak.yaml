@@ -1,0 +1,192 @@
+{{- if .Values.keycloak.enabled }}
+{{- $name := include "kickertool.keycloakName" . }}
+{{- $labels := include "kickertool.labels" (dict "ctx" . "component" "keycloak") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+type: Opaque
+data:
+  admin-password: {{ include "kickertool.secretValue" (dict "ctx" . "name" $name "key" "admin-password" "value" .Values.keycloak.adminPassword) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-realm
+  labels:
+    {{- $labels | nindent 4 }}
+data:
+  realm.json: |
+    {
+      "realm": {{ .Values.keycloak.realm | quote }},
+      "enabled": true,
+      "sslRequired": {{ .Values.keycloak.sslRequired | quote }},
+      "registrationAllowed": {{ .Values.keycloak.registrationAllowed }},
+      "loginWithEmailAllowed": true,
+      "duplicateEmailsAllowed": false,
+      "roles": {
+        "realm": [
+          {
+            "name": {{ .Values.app.adminRole | quote }},
+            "description": "Turnierleitung: darf Turniere verwalten, Runden starten und Ergebnisse festlegen"
+          }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": {{ .Values.keycloak.clientId | quote }},
+          "name": "Kickertool App",
+          "enabled": true,
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": {{ .Values.keycloak.directAccessGrants }},
+          "redirectUris": {{ toJson .Values.keycloak.redirectUris }},
+          "webOrigins": {{ toJson .Values.keycloak.webOrigins }},
+          "attributes": {
+            "pkce.code.challenge.method": "S256"
+          }
+        }
+      ]
+      {{- if .Values.keycloak.demoUsers }},
+      "users": [
+        {
+          "username": "admin", "enabled": true, "email": "admin@kicker.local", "emailVerified": true,
+          "firstName": "Turnier", "lastName": "Leitung",
+          "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+          "realmRoles": [{{ .Values.app.adminRole | quote }}]
+        },
+        {
+          "username": "anna", "enabled": true, "email": "anna@kicker.local", "emailVerified": true,
+          "firstName": "Anna", "lastName": "Beispiel",
+          "credentials": [{ "type": "password", "value": "anna", "temporary": false }]
+        },
+        {
+          "username": "ben", "enabled": true, "email": "ben@kicker.local", "emailVerified": true,
+          "firstName": "Ben", "lastName": "Beispiel",
+          "credentials": [{ "type": "password", "value": "ben", "temporary": false }]
+        }
+      ]
+      {{- end }}
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    {{- include "kickertool.selectorLabels" (dict "ctx" . "component" "keycloak") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "kickertool.selectorLabels" (dict "ctx" . "component" "keycloak") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kickertool.selectorLabels" (dict "ctx" . "component" "keycloak") | nindent 8 }}
+    spec:
+      initContainers:
+        # Wartet auf PostgreSQL und legt die Datenbank für Keycloak an, falls es sie noch nicht gibt.
+        - name: prepare-database
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          env:
+            - name: PGHOST
+              value: {{ include "kickertool.postgresqlName" . | quote }}
+            - name: PGUSER
+              value: {{ .Values.postgresql.username | quote }}
+            - name: PGDATABASE
+              value: {{ .Values.postgresql.database | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kickertool.dbSecretName" . }}
+                  key: password
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready; do echo 'Warte auf die Datenbank'; sleep 2; done
+              psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ .Values.keycloak.database }}'" | grep -q 1 \
+                || psql -c 'CREATE DATABASE "{{ .Values.keycloak.database }}"'
+      containers:
+        - name: keycloak
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          args: ["start", "--import-realm"]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.keycloak.adminUser | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}
+                  key: admin-password
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: "jdbc:postgresql://{{ include "kickertool.postgresqlName" . }}:5432/{{ .Values.keycloak.database }}"
+            - name: KC_DB_USERNAME
+              value: {{ .Values.postgresql.username | quote }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kickertool.dbSecretName" . }}
+                  key: password
+            # Externe Adresse: daraus entsteht der Aussteller (iss) im Token
+            - name: KC_HOSTNAME
+              value: {{ .Values.keycloak.hostname | quote }}
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            {{- with .Values.keycloak.proxyHeaders }}
+            - name: KC_PROXY_HEADERS
+              value: {{ . | quote }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: {{ $name }}-realm
+{{- end }}
