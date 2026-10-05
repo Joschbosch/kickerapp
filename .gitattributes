@@ -1,0 +1,6 @@
+# Einheitliche Zeilenenden. Shell-Skripte müssen LF haben, Windows-Skripte CRLF.
+* text=auto
+mvnw text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

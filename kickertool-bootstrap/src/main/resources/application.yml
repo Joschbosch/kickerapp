@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: kickertool
+  datasource:
+    url: ${KICKERTOOL_DB_URL:jdbc:postgresql://localhost:5432/kickertool}
+    username: ${KICKERTOOL_DB_USER:kickertool}
+    password: ${KICKERTOOL_DB_PASSWORD:kickertool}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Beliebiger OIDC-Provider. Die Schlüssel werden über die Discovery des Providers geladen.
+          issuer-uri: ${KICKERTOOL_OIDC_ISSUER_URI:http://localhost:8180/realms/kickertool}
+
+kickertool:
+  security:
+    # Wo im Token steht, ob jemand Admin ist. Defaults passen zu Keycloak-Realm-Rollen.
+    admin-claim: ${KICKERTOOL_ADMIN_CLAIM:realm_access.roles}
+    admin-role: ${KICKERTOOL_ADMIN_ROLE:kicker-admin}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

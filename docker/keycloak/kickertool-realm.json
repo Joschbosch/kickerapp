@@ -1,0 +1,61 @@
+{
+  "realm": "kickertool",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "kicker-admin",
+        "description": "Turnierleitung: darf Turniere verwalten, Runden starten und Ergebnisse festlegen"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "kickertool-app",
+      "name": "Kickertool App",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@kicker.local",
+      "emailVerified": true,
+      "firstName": "Turnier",
+      "lastName": "Leitung",
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["kicker-admin"]
+    },
+    {
+      "username": "anna",
+      "enabled": true,
+      "email": "anna@kicker.local",
+      "emailVerified": true,
+      "firstName": "Anna",
+      "lastName": "Beispiel",
+      "credentials": [{ "type": "password", "value": "anna", "temporary": false }]
+    },
+    {
+      "username": "ben",
+      "enabled": true,
+      "email": "ben@kicker.local",
+      "emailVerified": true,
+      "firstName": "Ben",
+      "lastName": "Beispiel",
+      "credentials": [{ "type": "password", "value": "ben", "temporary": false }]
+    }
+  ]
+}

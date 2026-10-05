@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>zur.koeln</groupId>
+    <artifactId>kickertool</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>kickertool</name>
+    <description>Turnierverwaltung für Kicker-Turniere (2 gegen 2, wechselnde Partner)</description>
+
+    <modules>
+        <module>kickertool-domain</module>
+        <module>kickertool-application</module>
+        <module>kickertool-adapter-persistence</module>
+        <module>kickertool-adapter-events</module>
+        <module>kickertool-adapter-rest</module>
+        <module>kickertool-bootstrap</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <archunit.version>1.5.1</archunit.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>zur.koeln</groupId>
+                <artifactId>kickertool-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>zur.koeln</groupId>
+                <artifactId>kickertool-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>zur.koeln</groupId>
+                <artifactId>kickertool-adapter-persistence</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>zur.koeln</groupId>
+                <artifactId>kickertool-adapter-events</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>zur.koeln</groupId>
+                <artifactId>kickertool-adapter-rest</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
