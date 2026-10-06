@@ -118,7 +118,7 @@ final class RestMapper {
     }
 
     static Responses.Event event(TournamentEvent event) {
-        return new Responses.Event(event.type().name(), event.matchId() != null ? event.matchId().value() : null,
-                event.occurredAt());
+        return new Responses.Event(event.id(), event.type().name(),
+                event.matchId() != null ? event.matchId().value() : null, event.occurredAt());
     }
 }

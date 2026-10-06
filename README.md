@@ -51,6 +51,7 @@ Registrierung und Login übernimmt der OIDC-Provider. Die API ist ein **Resource
 | Rolle, die zum Admin macht | `KICKERTOOL_ADMIN_ROLE` | `kicker-admin` |
 | Datenbank | `KICKERTOOL_DB_URL`, `_USER`, `_PASSWORD` | lokales Postgres, `kickertool` |
 | Swagger UI und OpenAPI-Doku | `KICKERTOOL_OPENAPI_ENABLED` | `true` (in Produktion `false`) |
+| Gültigkeit der Stream-Tickets | `KICKERTOOL_EVENTS_TICKET_TTL` | `2m` |
 | Erlaubte Browser-Adressen (CORS), kommagetrennt | `KICKERTOOL_CORS_ALLOWED_ORIGINS` | leer = nur dieselbe Adresse. Muster wie `https://*.example.com` oder `http://localhost:[*]` sind erlaubt |
 
 Der Claim-Pfad darf verschachtelt sein (`resource_access.<client>.roles`), eine Zeichenkette wird an Leerzeichen getrennt. Damit läuft die App mit jedem OIDC-Provider, der JWT-Access-Tokens ausstellt.
@@ -204,41 +205,10 @@ Als Spieler-ID kann überall `me` stehen.
 | `POST …/matches/{matchId}/result-proposal/confirmation` | Gegnerteam | Ergebnis bestätigen |
 | `POST …/matches/{matchId}/result-proposal/rejection` | Gegnerteam | Ergebnis ablehnen, der Admin entscheidet |
 | `PUT …/matches/{matchId}/result` | Admin | Ergebnis festlegen oder korrigieren |
-| `GET /api/tournaments/{id}/events` | alle | Live-Updates als Server-Sent Events |
+| `POST /api/tournaments/{id}/events/ticket` | alle | kurzlebiges Ticket, mit dem ein Browser den Stream ohne Authorization-Header öffnet |
+| `GET /api/tournaments/{id}/events` | alle | Live-Updates als Server-Sent Events (Bearer-Token oder `?ticket=`), mit Nachliefern über `Last-Event-ID` |
 
-**Live-Updates:** Der SSE-Stream sendet Hinweise (`TOURNAMENT_CHANGED`, `PARTICIPANTS_CHANGED`, `ROUND_STARTED`, `MATCHES_CHANGED`, `RANKING_CHANGED`) ohne Nutzdaten. Clients laden danach den neuen Stand über die normalen Endpunkte. Der Stream braucht den `Authorization`-Header, die Browser-`EventSource` kann das nicht, native Apps und `fetch`-basierte Clients schon. Die Verteilung läuft über den Port `TournamentEventBus`, der In-Memory-Adapter gilt für eine einzelne Instanz und lässt sich z. B. durch Redis ersetzen.
-
-## Bauen und Testen
-
-```bash
-./mvnw verify
-```
-
-- Domäne, Anwendungsschicht, Events, REST (MockMvc), Architekturregeln: laufen überall.
-- Persistenz-Tests laufen gegen H2. `PostgresPersistenceTest` prüft Flyway und Mapping gegen echtes PostgreSQL und braucht Docker, sonst wird er übersprungen.
-- `OpenApiSnapshotTest` vergleicht die laufende API mit `docs/openapi.json` und schlägt bei Abweichung fehl. Die CORS-Regeln prüfen `CorsTest` und `LocalProfileTest`.
-- `KickertoolEndToEndTest` spielt ein komplettes Turnier über HTTP durch (10 Spieler, 2 Tische, Dummy-Match, Ergebnisse mit Bestätigung, Admin-Korrektur, Pause, SSE) und ersetzt den OIDC-Provider durch Test-Tokens.
-
-
-## Noch offen
-
-- **Finale:** Nach X Runden soll noch eine Art Finale laufen. Das ist noch nicht gebaut. Bis dahin beendet `POST /finish` das ganze Turnier. Sobald das Finale feststeht, wird daraus das Ende der Tabellenrunde, mit der bleibenden Regel, dass es nur geht, wenn alle Ergebnisse bestätigt sind.
-
-## Entscheidungen
-
-Vom Auftraggeber bestätigt:
-
-- Die nächste Welle rückt nach, sobald für alle Matches am Tisch ein Ergebnis *eingetragen* ist, ohne auf die Bestätigung zu warten. Die Runde gilt erst mit bestätigten Ergebnissen als abgeschlossen.
-- Einspringer dürfen Ergebnisse eintragen und bestätigen, weil sie am Tisch stehen. Besteht ein Team nur aus Dummys ohne Einspringer, bleibt nur der Admin.
-- Admin-Korrekturen sind auch nach Turnierende möglich.
-- Das eintragende Team kann sein Ergebnis nicht selbst korrigieren. Ein Tippfehler läuft über Ablehnen und Admin-Entscheidung.
-- Ergebnisprüfung: kein Team über dem Tor-Limit, nicht beide auf dem Limit. Unentschieden unter dem Limit ist erlaubt (Zeitablauf).
-- Eine geänderte Tischzahl gilt erst ab der nächsten Welle, laufende Matches ziehen nicht um.
-- Beenden (der Tabellenrunde) geht nur, wenn alle Ergebnisse bestätigt sind.
-- Einspringer nur unter aktiven Teilnehmern. Spieler-Identität über `sub`, Admin meldet nur bekannte Spieler an. Ausgeschiedene melden sich nicht neu an, Abmelden nur vor dem Start.
-- Teamzuteilung: die ersten X Runden komplett zufällig (X konfigurierbar), danach Rangblöcke zu je 4 mit Mischen im Block. Die Partnerregel ist ein sehr starker Wunsch und wird nur verletzt, wenn nichts anderes geht.
-- Standardwert andomRounds = 2. Die Partnerregel gilt auch in den Zufallsrunden, aber nur für die letzte Runde und nur für echte Spieler (ein Einspringer als Partner zählt nicht).
-- Dummys rotieren: der unvollständige Block besteht aus den Spielern, die bisher am seltensten gegen oder mit Dummys gespielt haben. Der beste Block bekommt in der Auslosung zuerst einen Tisch, der Block mit den Dummys zuletzt.
+**Live-Updates:** Der SSE-Stream sendet Hinweise (`TOURNAMENT_CHANGED`, `PARTICIPANTS_CHANGED`, `ROUND_STARTED`, `MATCHES_CHANGED`, `RANKING_CHANGED`) ohne Nutzdaten. Clients laden danach den neuen Stand über die normalen Endpunkte. Anmelden geht mit dem Bearer-Token oder, für den Browser-`EventSource`, der keinen Header senden kann, mit einem **Ticket** (`POST …/events/ticket`, gilt 2 Minuten, nur für ein Turnier, einstellbar mit `KICKERTOOL_EVENTS_TICKET_TTL`). Jedes Event hat eine **Kennung**: Wer sich mit der Kennung des letzten Events neu verbindet (`Last-Event-ID` oder `lastEventId`), bekommt verpasste Events nachgeliefert, die letzten 200 je Turnier. Geht das nicht mehr (Server neu gestartet, zu lange weg), kommt ein `RESYNC` und der Client lädt alles neu. Die Verteilung läuft über den Port `TournamentEventBus`, der In-Memory-Adapter und die Tickets gelten für eine einzelne Instanz. Für mehrere Instanzen bräuchte es z. B. Redis.
 
 ### Annahmen, die noch bestätigt werden müssen
 

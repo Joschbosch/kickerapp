@@ -108,7 +108,8 @@ final class InMemoryRepositories {
         }
 
         @Override
-        public EventSubscription subscribe(TournamentId tournamentId, Consumer<TournamentEvent> listener) {
+        public EventSubscription subscribe(TournamentId tournamentId, String lastEventId,
+                Consumer<TournamentEvent> listener) {
             listeners.computeIfAbsent(tournamentId, k -> new ArrayList<>()).add(listener);
             return () -> listeners.get(tournamentId).remove(listener);
         }

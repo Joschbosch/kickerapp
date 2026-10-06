@@ -52,7 +52,8 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths", hasKey("/api/tournaments/{tournamentId}/matches/{matchId}/result-proposal/confirmation")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/tournaments/{tournamentId}/matches/{matchId}/result-proposal/rejection")))
                 .andExpect(jsonPath("$.paths", hasKey("/api/tournaments/{tournamentId}/matches/{matchId}/result")))
-                .andExpect(jsonPath("$.paths", hasKey("/api/tournaments/{tournamentId}/events")));
+                .andExpect(jsonPath("$.paths", hasKey("/api/tournaments/{tournamentId}/events")))
+                .andExpect(jsonPath("$.paths", hasKey("/api/tournaments/{tournamentId}/events/ticket")));
     }
 
     @Test
@@ -89,6 +90,18 @@ class OpenApiDocumentationTest {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(jsonPath("$.paths['/api/tournaments/{tournamentId}/events'].get.responses['200'].content",
                         hasKey("text/event-stream")));
+    }
+
+    @Test
+    void documentsTheTicketFlowAndReplayOfTheStream() throws Exception {
+        String stream = "$.paths['/api/tournaments/{tournamentId}/events'].get";
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(jsonPath("$.paths['/api/tournaments/{tournamentId}/events/ticket'].post.summary")
+                        .value("Ticket für den Event-Stream holen"))
+                .andExpect(jsonPath(stream + ".parameters[?(@.name=='ticket')]").isNotEmpty())
+                .andExpect(jsonPath(stream + ".parameters[?(@.name=='Last-Event-ID')].in").value("header"))
+                .andExpect(jsonPath("$.components.schemas.EventTicket.properties", hasKey("streamUrl")))
+                .andExpect(jsonPath("$.components.schemas.Event.properties", hasKey("id")));
     }
 
     @Test

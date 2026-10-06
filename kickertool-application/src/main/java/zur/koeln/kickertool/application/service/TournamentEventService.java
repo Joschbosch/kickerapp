@@ -21,10 +21,16 @@ public class TournamentEventService implements TournamentEventUseCase {
     }
 
     @Override
-    public EventSubscription subscribe(TournamentId tournamentId, Consumer<TournamentEvent> listener) {
+    public EventSubscription subscribe(TournamentId tournamentId, String lastEventId,
+            Consumer<TournamentEvent> listener) {
+        requireTournament(tournamentId);
+        return eventBus.subscribe(tournamentId, lastEventId, listener);
+    }
+
+    @Override
+    public void requireTournament(TournamentId tournamentId) {
         if (!tournaments.exists(tournamentId)) {
             throw new NotFoundException("Turnier nicht gefunden: " + tournamentId);
         }
-        return eventBus.subscribe(tournamentId, listener);
     }
 }

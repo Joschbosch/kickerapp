@@ -11,14 +11,18 @@ wechseln. Es gibt nur wenige Tische, deshalb spielen die Matches einer Runde in 
 Ergebnisse am Handy selbst ein, das Gegnerteam bestätigt. Der **Admin** (Turnierleitung) plant das Turnier, startet die
 Runden und entscheidet Streitfälle. Daraus entsteht eine Einzelrangliste.
 
-Wer was braucht:
+Wer was braucht, und auf welchem Gerät (so ist es geplant):
 
-| Rolle | Braucht |
-|---|---|
-| Spieler (Handy) | anmelden, "wo muss ich spielen" (Tisch, Partner, Gegner), Ergebnis eintragen oder bestätigen, pausieren oder ausscheiden, Rangliste |
-| Admin | Turnier planen und konfigurieren, starten, Runden auslosen, Ergebnisse festlegen und korrigieren, Tischzahl ändern, Turnier beenden |
-| Anzeige (Großbildschirm, optional) | Rangliste und aktuelle Runde mit Tischen, nur lesen |
+| Rolle | Gerät | Braucht |
+|---|---|---|
+| Spieler | **Handy-App** | anmelden, "wo muss ich spielen" (Tisch, Partner, Gegner), Ergebnis eintragen oder bestätigen, pausieren oder ausscheiden, Rangliste |
+| Spieler | **Desktop-Web** | sich zum Turnier anmelden, später die Rangliste und die eigenen Spiele nachschauen |
+| Admin | **Desktop-Web** | alles verwalten: Turnier planen und konfigurieren, starten, Runden auslosen, Ergebnisse festlegen und korrigieren, Tischzahl ändern, Turnier beenden. Dazu **mehrere Fenster oder Bildschirme mit der Tabelle** (Rangliste, aktuelle Runde mit Tischen) |
 
+Es gibt also mindestens zwei Clients (Handy für Spieler, Desktop-Web für Admin und Spieler), die dieselbe API nutzen.
+Die Anzeigen auf mehreren Bildschirmen sind Fenster einer **angemeldeten Admin-Sitzung**, kein öffentlicher Zugang: Alle
+Endpunkte brauchen ein Token. Diese Fenster laufen stundenlang, daher müssen sie Tokens erneuern und den Stream selbst neu
+verbinden (Abschnitt 3 und 6).
 ## 2. Backend lokal starten
 
 Voraussetzung: **JDK 21 oder neuer** und Internet (Maven lädt beim ersten Start Abhängigkeiten). Docker ist nicht nötig.
@@ -80,6 +84,10 @@ Registrierung und Login übernimmt ein OIDC-Provider (Keycloak). Die API prüft 
 
   Das Token gilt 8 Stunden. Für den echten Browser-Login (Weiterleitung, PKCE) braucht man den Docker-Stack mit
   Keycloak. Dort sind alle Rückleitungen erlaubt (`redirectUris: *`, nur für lokale Tests).
+- **Lange laufende Sitzungen (Tabellen-Bildschirme, Admin):** Access-Tokens sind kurzlebig (bei Keycloak standardmäßig
+  wenige Minuten). Die UI erneuert sie selbst (stilles Erneuern der OIDC-Bibliothek, Refresh-Token) und holt für jede neue
+  Stream-Verbindung ein frisches Ticket (Abschnitt 6). Der simulierte lokale Login stellt Tokens für 8 Stunden aus und kennt
+  kein Erneuern, das reicht für Entwicklung und Tests.
 - **Rückleitungen im Cluster:** Beim Helm-Chart mit `values-local.yaml` sind die Ports 3000, 4200 und 5173 freigegeben.
   Andere UI-Adressen müssen in `keycloak.redirectUris` und `keycloak.webOrigins` eingetragen werden.
 
@@ -98,7 +106,7 @@ Hier die Zuordnung zu Bildschirmen:
 | Rangliste | `GET …/ranking` |
 | Runden und Tische | `GET …/rounds/current`, `GET …/rounds` |
 | Admin | `POST /api/tournaments`, `PUT …/config`, `POST …/start`, `POST …/rounds`, `PUT …/matches/{id}/result`, `POST …/finish` |
-| Live-Updates | `GET …/events` (siehe Abschnitt 6) |
+| Live-Updates | `POST …/events/ticket`, dann `GET …/events?ticket=…` (siehe Abschnitt 6) |
 
 Konventionen:
 
@@ -171,28 +179,82 @@ dass sich etwas geändert hat. Die UI lädt danach den neuen Stand über die nor
 
 | Event | Wann |
 |---|---|
-| `connected` | direkt nach dem Verbinden |
+| `connected` | direkt nach dem Verbinden (mit `retry: 3000`, der Browser verbindet sich dann nach 3 Sekunden neu) |
 | `TOURNAMENT_CHANGED` | Name, Datum, Konfiguration oder Status geändert |
 | `PARTICIPANTS_CHANGED` | Anmeldung, Pause, Ausscheiden |
 | `ROUND_STARTED` | neue Runde ausgelost |
 | `MATCHES_CHANGED` | Tische, Status oder Ergebnisse (mit `matchId`, wenn ein einzelnes Match betroffen ist) |
 | `RANKING_CHANGED` | Rangliste hat sich geändert |
+| `RESYNC` | Events wurden verpasst und lassen sich nicht mehr nachliefern: **den Stand komplett neu laden** |
 
-Daten eines Events: `{ "type": "MATCHES_CHANGED", "matchId": "…", "occurredAt": "2026-10-05T20:15:00Z" }`.
+Daten eines Events: `{ "id": "mf3k2a-17", "type": "MATCHES_CHANGED", "matchId": "…", "occurredAt": "2026-10-05T20:15:00Z" }`.
+Die `id` steht auch als SSE-Feld `id:` im Stream, der Browser liefert sie als `event.lastEventId`.
 
-Wichtig:
+### Verbinden aus dem Browser: mit Ticket
 
-- **Der Stream braucht den `Authorization`-Header.** Der Browser-`EventSource` kann keine eigenen Header senden. Man
-  braucht eine Fetch-basierte Lösung (z. B. die Bibliothek `@microsoft/fetch-event-source`) oder eine native
-  HTTP-Verbindung in der App. Alternativ pollt die UI (z. B. alle 5 Sekunden), das reicht für ein Turnier.
-- Alle 20 Sekunden kommt ein Kommentar (`: ping`), nach spätestens 30 Minuten endet die Verbindung. Die UI **verbindet
-  sich neu** und lädt danach den Stand frisch, verpasste Events werden nicht nachgeliefert.
-- Die Verteilung arbeitet im Speicher einer Backend-Instanz. Das passt zum Betrieb mit einer Instanz.
+Der Browser-`EventSource` kann keinen `Authorization`-Header senden. Deshalb holt die UI mit ihrem Token ein kurzlebiges
+**Ticket** und hängt es an die Adresse:
 
+1. `POST /api/tournaments/{id}/events/ticket` (mit Bearer-Token) antwortet mit
+   `{ "ticket": "…", "expiresInSeconds": 120, "streamUrl": "/api/tournaments/{id}/events?ticket=…" }`.
+2. `new EventSource(BACKEND + streamUrl)`. Das geht ohne Header.
+
+Das Ticket gilt nur für dieses Turnier, 2 Minuten lang, in dieser Zeit auch mehrfach (damit sich der Browser nach einem
+kurzen Abbruch mit derselben Adresse neu verbinden kann). Eine bereits laufende Verbindung bleibt vom Ablauf unberührt.
+Native Apps und andere Clients, die Header setzen können, nehmen weiter einfach das Bearer-Token und brauchen kein Ticket.
+
+### Verpasste Events nachliefern
+
+Jedes Event hat eine `id`. Verbindet sich ein Client mit der `id` des letzten empfangenen Events neu, bekommt er alles
+nachgeliefert, was er verpasst hat, in der richtigen Reihenfolge und ohne Doppelte:
+
+- **Derselbe `EventSource` verbindet sich neu** (Netz weg, Server kurz weg): Der Browser schickt `Last-Event-ID` von allein.
+- **Ein neues `EventSource`-Objekt** (z. B. nach abgelaufenem Ticket): kann keinen Header setzen, deshalb die letzte `id` als
+  Parameter anhängen: `…/events?ticket=…&lastEventId=<id>`. Der Header hat Vorrang vor dem Parameter.
+- Das Backend hält je Turnier die letzten 200 Events vor. Ist die Lücke größer, wurde der Server neu gestartet oder ist die
+  `id` unbekannt, kommt ein einzelnes **`RESYNC`** (mit der aktuellen `id`). Dann alles neu laden.
+
+Skizze für die UI (nicht getestet):
+
+```js
+let lastEventId = null;
+
+async function connect(tournamentId) {
+  const t = await api.post(`/api/tournaments/${tournamentId}/events/ticket`);        // mit Bearer-Token
+  const url = BACKEND + t.streamUrl + (lastEventId ? `&lastEventId=${encodeURIComponent(lastEventId)}` : '');
+  const es = new EventSource(url);
+
+  for (const type of ['TOURNAMENT_CHANGED', 'PARTICIPANTS_CHANGED', 'ROUND_STARTED', 'MATCHES_CHANGED',
+                      'RANKING_CHANGED', 'RESYNC']) {
+    es.addEventListener(type, (e) => {
+      lastEventId = e.lastEventId;                      // die id des Events
+      type === 'RESYNC' ? reloadEverything() : reloadFor(type);
+    });
+  }
+  es.onerror = () => {
+    // CONNECTING: der Browser verbindet sich mit Last-Event-ID von allein neu.
+    // CLOSED (z. B. Ticket abgelaufen, 401): selbst mit neuem Ticket neu verbinden.
+    if (es.readyState === EventSource.CLOSED) setTimeout(() => connect(tournamentId), 3000);
+  };
+  return es;
+}
+```
+
+Beim allerersten Verbinden gibt es kein Nachliefern: Die UI lädt den Stand einmal selbst (`reloadEverything()`).
+
+### Weiteres
+
+- Alle 20 Sekunden kommt ein Kommentar (`: ping`), nach spätestens 30 Minuten endet die Verbindung (der Browser verbindet sich
+  neu, siehe oben). Beim Herunterfahren des Servers werden die Streams sofort beendet.
+- Das Ticket steht in der Adresse und kann dadurch in Protokollen von Proxys landen. Es ist kurz gültig, nur für ein Turnier
+  und die Events enthalten keine Daten. Trotzdem Adressen mit Ticket nicht ausgeben oder speichern.
+- Die Verteilung und die Tickets liegen im Speicher einer Backend-Instanz. Das passt zum Betrieb mit einer Instanz.
+- Alternativ zum Stream kann die UI pollen (z. B. alle 5 Sekunden), das reicht für ein Turnier.
 ## 7. Bekannte Lücken und Eigenheiten
 
 - **Finale nach X Runden** ist noch nicht gebaut. Bis dahin beendet `POST …/finish` das ganze Turnier.
 - **Push-Benachrichtigungen** aufs Handy ("dein Match startet") gibt es nicht, nur den Event-Stream bei geöffneter App.
+- **Events sind für alle gleich:** Nach jedem Event laden alle verbundenen Clients neu. Gezielte Events pro Spieler ("dein Match ist am Tisch") gibt es nicht, sie wären die Grundlage für Push.
 - **Teamzuteilung** (Zufall in den ersten Runden, danach Rangblöcke zu je 4, keine gleichen Partner in zwei aufeinander-
   folgenden Runden) ist ein erster Ansatz und kann sich noch ändern. Die API bleibt davon unberührt.
 - **Tippfehler im Ergebnis:** Das eintragende Team kann nicht selbst korrigieren. Das Gegnerteam lehnt ab, der Admin
@@ -204,14 +266,13 @@ Wichtig:
 
 ## 8. Offene Entscheidungen (vor dem Start klären)
 
-- **Native App oder Web-App (PWA)?** Der Auftraggeber spricht von einer "App auf dem Handy". Das beeinflusst Login
-  (Weiterleitung), Live-Updates und Push.
+- **Handy: native App oder PWA?** Der Auftraggeber spricht von einer "App auf dem Handy". Das beeinflusst Login
+  (Weiterleitung), Live-Updates und Push. Die Desktop-Variante ist eine Web-App.
+- **Eine UI oder zwei?** Handy und Desktop-Web können dieselbe Codebasis teilen (responsive Web-App oder PWA) oder getrennt
+  entstehen. Die API ist für beide dieselbe.
 - **Wo wird die UI ausgeliefert?** Unter derselben Adresse wie das Backend (Ingress mit Pfaden) entfällt CORS. Auf einer
   eigenen Adresse muss sie im Backend freigegeben werden (`KICKERTOOL_CORS_ALLOWED_ORIGINS`) und im Keycloak als
   Rückleitung eingetragen sein.
-- **Großbildschirm-Ansicht** (Rangliste und Tische ohne Login)? Das ginge im Moment nicht, alle Endpunkte brauchen ein
-  Token. Dafür bräuchte es eine bewusste Entscheidung für öffentlich lesbare Endpunkte.
-
 ## 9. Arbeiten mit KI-Assistenten
 
 - Im Backend-Repo steht `AGENTS.md` (gilt für Codex und andere) und `CLAUDE.md` (verweist darauf). Für das UI-Repo gibt

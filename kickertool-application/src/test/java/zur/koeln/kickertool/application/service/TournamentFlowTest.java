@@ -257,6 +257,28 @@ class TournamentFlowTest {
     }
 
     @Test
+    void passesTheLastEventIdOnToTheBus() {
+        TournamentEventService events = new TournamentEventService(tournaments, eventBus);
+        TournamentId id = planAndRegister(2, 1);
+        List<String> seen = new ArrayList<>();
+        InMemoryRepositories.RecordingEventBus recording = new InMemoryRepositories.RecordingEventBus() {
+            @Override
+            public zur.koeln.kickertool.application.port.out.EventSubscription subscribe(TournamentId tournamentId,
+                    String lastEventId, java.util.function.Consumer<TournamentEvent> listener) {
+                seen.add(lastEventId);
+                return super.subscribe(tournamentId, lastEventId, listener);
+            }
+        };
+
+        new TournamentEventService(tournaments, recording).subscribe(id, "abc-7", e -> { });
+        new TournamentEventService(tournaments, recording).subscribe(id, e -> { });
+
+        assertThat(seen).containsExactly("abc-7", null);
+        assertThatThrownBy(() -> events.requireTournament(TournamentId.random())).isInstanceOf(NotFoundException.class);
+        events.requireTournament(id);
+    }
+
+    @Test
     void eventSubscriptionRequiresExistingTournamentAndDeliversEvents() {
         TournamentEventService events = new TournamentEventService(tournaments, eventBus);
         assertThatThrownBy(() -> events.subscribe(TournamentId.random(), e -> { }))

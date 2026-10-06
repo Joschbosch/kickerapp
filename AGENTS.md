@@ -47,6 +47,15 @@ Diese Datei gilt für alle Assistenten (Codex, Claude Code, ...). Eigenheiten ei
 - CORS: Standardmäßig ist keine Browser-Herkunft erlaubt. Freigabe über `kickertool.cors.allowed-origins`
   (Umgebungsvariable `KICKERTOOL_CORS_ALLOWED_ORIGINS`, kommagetrennt, Muster wie `http://localhost:[*]` erlaubt).
 
+## Live-Updates (SSE)
+- `GET …/events` liefert Hinweise ohne Nutzdaten. Der Browser-`EventSource` kann keinen Authorization-Header senden: Die UI holt mit
+  dem Token ein Ticket (`POST …/events/ticket`, `EventTicketService`, `EventTicketFilter`) und öffnet `…/events?ticket=…`. Tickets
+  gelten nur für ein Turnier, kurz (`kickertool.events.ticket-ttl`, Standard 2m) und mehrfach, damit sich der Browser neu verbinden kann.
+- Events tragen eine Kennung `<Start>-<Nummer>` (je Turnier hochgezählt, vergeben vom `InMemoryTournamentEventBus` beim Ausliefern, nach dem
+  Commit). Mit `Last-Event-ID` bzw. `lastEventId` werden verpasste Events nachgeliefert, sonst kommt `RESYNC`. Verlauf und Tickets liegen im
+  Speicher einer Instanz. Änderungen daran mit `InMemoryTournamentEventBusTest`, `TournamentEventsControllerTest` und
+  `EventStreamEndToEndTest` absichern.
+
 ## Lokaler Testmodus
 - Modul `kickertool-local` (simulierter OIDC-Provider unter `/mock-oidc`, Testnutzer, Demo-Turnier), Spring-Profil
   `local`. Das Bootstrap-Modul bindet es nur mit dem Maven-Profil `local` zur Laufzeit ein, sonst nur als
