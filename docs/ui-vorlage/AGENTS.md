@@ -45,8 +45,12 @@ Einzelrangliste). Die UI ist ein reiner Client der Backend-REST-API und enthält
 - Tokens und Passwörter nie ins Repo, in Logs oder in URLs schreiben.
 
 ## Live-Updates
-- `GET /api/tournaments/{id}/events` (Server-Sent Events, braucht den Authorization-Header, daher keine Browser-`EventSource`).
-  Die Events enthalten keine Daten, die UI lädt nach einem Event neu. Bei Verbindungsabbruch neu verbinden und neu laden.
+- Der Browser-`EventSource` kann keinen Authorization-Header senden. Ablauf: `POST /api/tournaments/{id}/events/ticket` mit dem
+  Token, dann `new EventSource(BACKEND + streamUrl)` (Ticket in der Adresse). Details und Skizze in der Übergabe, Abschnitt 6.
+- Die Events enthalten keine Daten, die UI lädt nach einem Event neu. Jedes Event hat eine `id`: merken und beim erneuten Verbinden
+  mitschicken (`Last-Event-ID` macht der Browser von allein, bei einem neuen `EventSource` als `&lastEventId=` anhängen). Ein
+  `RESYNC` heißt: alles neu laden.
+- Tabellen-Bildschirme laufen stundenlang: Token erneuern, bei Abbruch (`readyState === CLOSED`) mit neuem Ticket neu verbinden.
 
 ## Prüfen vor dem Abschluss
 - `<Lint, Typprüfung und Tests ausführen: Befehle eintragen>`

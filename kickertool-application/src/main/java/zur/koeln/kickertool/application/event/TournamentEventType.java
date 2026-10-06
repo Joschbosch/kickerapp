@@ -10,5 +10,10 @@ public enum TournamentEventType {
     /** Matches haben sich geändert (Tische, Ergebnisse, Status). */
     MATCHES_CHANGED,
     /** Die Rangliste hat sich geändert. */
-    RANKING_CHANGED
+    RANKING_CHANGED,
+    /**
+     * Der Client hat Events verpasst, die sich nicht mehr nachliefern lassen (zu lange weg oder der Server wurde neu
+     * gestartet). Er muss den Stand komplett neu laden.
+     */
+    RESYNC
 }

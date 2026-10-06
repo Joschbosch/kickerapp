@@ -51,6 +51,10 @@
       },
       "Event" : {
         "properties" : {
+          "id" : {
+            "description" : "Kennung des Events. Beim Neuverbinden als Last-Event-ID senden, dann werden verpasste Events nachgeliefert",
+            "type" : "string"
+          },
           "matchId" : {
             "format" : "uuid",
             "type" : [ "string", "null" ]
@@ -60,6 +64,26 @@
             "type" : "string"
           },
           "type" : {
+            "description" : "TOURNAMENT_CHANGED, PARTICIPANTS_CHANGED, ROUND_STARTED, MATCHES_CHANGED, RANKING_CHANGED oder RESYNC (Stand komplett neu laden)",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EventTicket" : {
+        "description" : "Ticket zum Öffnen des Event-Streams ohne Authorization-Header",
+        "properties" : {
+          "expiresInSeconds" : {
+            "description" : "So lange gilt das Ticket (auch mehrfach), die laufende Verbindung bleibt davon unberührt",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "streamUrl" : {
+            "description" : "Fertige Adresse des Streams mit Ticket, relativ zum Backend",
+            "type" : "string"
+          },
+          "ticket" : {
+            "description" : "Das Ticket, nur für dieses Turnier",
             "type" : "string"
           }
         },
@@ -2521,7 +2545,7 @@
     },
     "/api/tournaments/{tournamentId}/events" : {
       "get" : {
-        "description" : "Server-Sent Events. Sendet `connected` und danach bei Änderungen die Events `TOURNAMENT_CHANGED`, `PARTICIPANTS_CHANGED`, `ROUND_STARTED`, `MATCHES_CHANGED` und `RANKING_CHANGED` (JSON mit `type`, `matchId`, `occurredAt`, ohne Nutzdaten). Clients laden danach den neuen Stand über die normalen Endpunkte. Braucht den Authorization-Header, in Swagger UI nicht darstellbar, lokal z. B. mit `curl -N -H \"Authorization: Bearer ...\"`.",
+        "description" : "Server-Sent Events. Sendet `connected` und danach bei Änderungen die Events `TOURNAMENT_CHANGED`, `PARTICIPANTS_CHANGED`, `ROUND_STARTED`, `MATCHES_CHANGED` und `RANKING_CHANGED` (JSON mit `id`, `type`, `matchId`, `occurredAt`, ohne Nutzdaten). Clients laden danach den neuen Stand über die normalen Endpunkte.\n\n**Anmeldung:** mit dem Bearer-Token im `Authorization`-Header oder mit einem Ticket in `ticket`.\n\n**Nachliefern:** Jedes Event hat eine `id`. Wer sich mit der `id` des letzten empfangenen Events in `Last-Event-ID` (oder, wo kein Header möglich ist, in `lastEventId`) neu verbindet, der Browser macht das bei einer Wiederverbindung desselben `EventSource` von allein, bekommt die verpassten Events nachgeliefert. Geht das nicht mehr (zu lange weg, Server neu gestartet), kommt ein einzelnes `RESYNC`: Dann den Stand komplett neu laden.\n\nIn Swagger UI nicht darstellbar, lokal z. B. mit `curl -N -H \"Authorization: Bearer ...\"`.",
         "operationId" : "stream",
         "parameters" : [ {
           "in" : "path",
@@ -2529,6 +2553,30 @@
           "required" : true,
           "schema" : {
             "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Kennung des letzten empfangenen Events, für das Nachliefern verpasster Events",
+          "in" : "header",
+          "name" : "Last-Event-ID",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Ticket statt Bearer-Token, siehe `POST …/events/ticket`",
+          "in" : "query",
+          "name" : "ticket",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Wie `Last-Event-ID`, für Clients, die keinen Header setzen können: ein neues `EventSource`-Objekt kann das nicht. Der Header hat Vorrang.",
+          "in" : "query",
+          "name" : "lastEventId",
+          "required" : false,
+          "schema" : {
             "type" : "string"
           }
         } ],
@@ -2676,6 +2724,166 @@
           }
         },
         "summary" : "Live-Updates abonnieren",
+        "tags" : [ "Live-Updates" ]
+      }
+    },
+    "/api/tournaments/{tournamentId}/events/ticket" : {
+      "post" : {
+        "description" : "Der Browser-`EventSource` kann keinen `Authorization`-Header senden. Mit dem Bearer-Token holt die UI hier ein kurzlebiges Ticket und öffnet damit den Stream: `GET …/events?ticket=<ticket>` (die Adresse steht fertig in `streamUrl`). Das Ticket gilt nur für dieses Turnier und nur kurz (`expiresInSeconds`), in dieser Zeit auch mehrfach, damit sich der Browser nach einem Verbindungsabbruch mit derselben Adresse neu verbinden kann. Danach holt die UI ein neues Ticket. Die laufende Verbindung bleibt vom Ablauf unberührt.",
+        "operationId" : "createTicket",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "tournamentId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EventTicket"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "properties" : {
+                    "detail" : {
+                      "example" : "Runde 1 ist noch nicht abgeschlossen",
+                      "type" : "string"
+                    },
+                    "instance" : {
+                      "type" : "string"
+                    },
+                    "status" : {
+                      "example" : 409,
+                      "format" : "int32",
+                      "type" : "integer"
+                    },
+                    "title" : {
+                      "example" : "Conflict",
+                      "type" : "string"
+                    },
+                    "type" : {
+                      "example" : "about:blank",
+                      "type" : "string"
+                    }
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "Ungültige Eingabe, z. B. Pflichtfeld fehlt oder Ergebnis über dem Tor-Limit"
+          },
+          "401" : {
+            "description" : "Kein oder ungültiges Token"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "properties" : {
+                    "detail" : {
+                      "example" : "Runde 1 ist noch nicht abgeschlossen",
+                      "type" : "string"
+                    },
+                    "instance" : {
+                      "type" : "string"
+                    },
+                    "status" : {
+                      "example" : 409,
+                      "format" : "int32",
+                      "type" : "integer"
+                    },
+                    "title" : {
+                      "example" : "Conflict",
+                      "type" : "string"
+                    },
+                    "type" : {
+                      "example" : "about:blank",
+                      "type" : "string"
+                    }
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "Keine Berechtigung, z. B. kein Admin oder nicht Teil des Matches"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "properties" : {
+                    "detail" : {
+                      "example" : "Runde 1 ist noch nicht abgeschlossen",
+                      "type" : "string"
+                    },
+                    "instance" : {
+                      "type" : "string"
+                    },
+                    "status" : {
+                      "example" : 409,
+                      "format" : "int32",
+                      "type" : "integer"
+                    },
+                    "title" : {
+                      "example" : "Conflict",
+                      "type" : "string"
+                    },
+                    "type" : {
+                      "example" : "about:blank",
+                      "type" : "string"
+                    }
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "Nicht gefunden"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "properties" : {
+                    "detail" : {
+                      "example" : "Runde 1 ist noch nicht abgeschlossen",
+                      "type" : "string"
+                    },
+                    "instance" : {
+                      "type" : "string"
+                    },
+                    "status" : {
+                      "example" : 409,
+                      "format" : "int32",
+                      "type" : "integer"
+                    },
+                    "title" : {
+                      "example" : "Conflict",
+                      "type" : "string"
+                    },
+                    "type" : {
+                      "example" : "about:blank",
+                      "type" : "string"
+                    }
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "Passt nicht zum aktuellen Stand, z. B. falscher Turnierstatus oder Runde nicht abgeschlossen"
+          }
+        },
+        "summary" : "Ticket für den Event-Stream holen",
         "tags" : [ "Live-Updates" ]
       }
     },
