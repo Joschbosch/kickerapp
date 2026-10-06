@@ -53,6 +53,8 @@ services:
       KICKERTOOL_OIDC_ISSUER_URI: http://localhost:8180/realms/kickertool
       # Im Container ist Keycloak aber unter seinem Dienstnamen erreichbar, von dort kommen die Schlüssel.
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/kickertool/protocol/openid-connect/certs
+      # Eine UI im Entwicklungsmodus auf einem lokalen Port darf die API aufrufen.
+      KICKERTOOL_CORS_ALLOWED_ORIGINS: "${KICKERTOOL_CORS_ALLOWED_ORIGINS:-http://localhost:[*],http://127.0.0.1:[*]}"
     ports:
       - "8080:8080"
 

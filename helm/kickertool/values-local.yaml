@@ -3,12 +3,25 @@
 #   kubectl port-forward svc/<release>-kickertool-keycloak 8180:8080
 #
 # Nur für lokale Tests: Testnutzer mit schwachen Passwörtern und ohne HTTPS.
+app:
+  # Eine UI im Entwicklungsmodus auf einem lokalen Port darf die API aufrufen.
+  corsAllowedOrigins:
+    - "http://localhost:[*]"
+    - "http://127.0.0.1:[*]"
+
 keycloak:
   hostname: "http://localhost:8180"
+  # Swagger UI (8080) und übliche Entwicklungsserver einer UI: React/Next (3000), Angular (4200), Vite (5173)
   redirectUris:
     - "http://localhost:8080/*"
+    - "http://localhost:3000/*"
+    - "http://localhost:4200/*"
+    - "http://localhost:5173/*"
   webOrigins:
     - "http://localhost:8080"
+    - "http://localhost:3000"
+    - "http://localhost:4200"
+    - "http://localhost:5173"
   sslRequired: none
   directAccessGrants: true
   demoUsers: true

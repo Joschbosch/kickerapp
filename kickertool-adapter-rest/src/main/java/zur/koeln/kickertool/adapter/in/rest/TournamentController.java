@@ -55,21 +55,21 @@ class TournamentController {
         TournamentView view = management.plan(actor, request.name(), request.date(),
                 request.config() != null ? request.config().toDomain() : null);
         UUID id = view.tournament().id().value();
-        return ResponseEntity.created(URI.create("/api/tournaments/" + id)).body(RestMapper.tournament(view));
+        return ResponseEntity.created(URI.create("/api/tournaments/" + id)).body(RestMapper.tournament(view, actor));
     }
 
     @Operation(tags = TOURNAMENTS, summary = "Turnier abrufen",
             description = "Mit Konfiguration, Teilnehmern und der aktuellen Runde samt Matches.")
     @GetMapping("/{id}")
-    Responses.Tournament get(@Parameter(description = "Turnier-ID") @PathVariable UUID id) {
-        return RestMapper.tournament(queries.getTournament(new TournamentId(id)));
+    Responses.Tournament get(Actor actor, @Parameter(description = "Turnier-ID") @PathVariable UUID id) {
+        return RestMapper.tournament(queries.getTournament(new TournamentId(id)), actor);
     }
 
     @Operation(tags = TOURNAMENTS, summary = "Name und Datum ändern", description = "**Nur Admin.**")
     @PutMapping("/{id}")
     Responses.Tournament update(Actor actor, @PathVariable UUID id, @Valid @RequestBody Requests.UpdateTournament request) {
         return RestMapper.tournament(
-                management.updateDetails(actor, new TournamentId(id), request.name(), request.date()));
+                management.updateDetails(actor, new TournamentId(id), request.name(), request.date()), actor);
     }
 
     @Operation(tags = TOURNAMENTS, summary = "Konfiguration ersetzen",
@@ -78,7 +78,7 @@ class TournamentController {
                     + "die Rangliste.")
     @PutMapping("/{id}/config")
     Responses.Tournament updateConfig(Actor actor, @PathVariable UUID id, @Valid @RequestBody Requests.Config request) {
-        return RestMapper.tournament(management.updateConfig(actor, new TournamentId(id), request.toDomain()));
+        return RestMapper.tournament(management.updateConfig(actor, new TournamentId(id), request.toDomain()), actor);
     }
 
     @Operation(tags = TOURNAMENTS, summary = "Turnier starten",
@@ -86,7 +86,7 @@ class TournamentController {
                     + "neue Spieler spielen ab der nächsten Runde mit.")
     @PostMapping("/{id}/start")
     Responses.Tournament start(Actor actor, @PathVariable UUID id) {
-        return RestMapper.tournament(management.start(actor, new TournamentId(id)));
+        return RestMapper.tournament(management.start(actor, new TournamentId(id)), actor);
     }
 
     @Operation(tags = TOURNAMENTS, summary = "Nächste Runde auslosen",
@@ -97,14 +97,14 @@ class TournamentController {
     ResponseEntity<Responses.Tournament> startNextRound(Actor actor, @PathVariable UUID id) {
         TournamentView view = management.startNextRound(actor, new TournamentId(id));
         return ResponseEntity.created(URI.create("/api/tournaments/" + id + "/rounds/current"))
-                .body(RestMapper.tournament(view));
+                .body(RestMapper.tournament(view, actor));
     }
 
     @Operation(tags = TOURNAMENTS, summary = "Turnier beenden",
             description = "**Nur Admin.** Nur möglich, wenn alle Ergebnisse bestätigt sind.")
     @PostMapping("/{id}/finish")
     Responses.Tournament finish(Actor actor, @PathVariable UUID id) {
-        return RestMapper.tournament(management.finish(actor, new TournamentId(id)));
+        return RestMapper.tournament(management.finish(actor, new TournamentId(id)), actor);
     }
 
     @Operation(tags = ROUNDS, summary = "Rangliste",
@@ -117,16 +117,16 @@ class TournamentController {
 
     @Operation(tags = ROUNDS, summary = "Alle Runden mit Matches")
     @GetMapping("/{id}/rounds")
-    List<Responses.Round> rounds(@PathVariable UUID id) {
-        return RestMapper.rounds(queries.getTournament(new TournamentId(id)));
+    List<Responses.Round> rounds(Actor actor, @PathVariable UUID id) {
+        return RestMapper.rounds(queries.getTournament(new TournamentId(id)), actor);
     }
 
     @Operation(tags = ROUNDS, summary = "Aktuelle Runde", description = "404, solange noch keine Runde gestartet wurde.")
     @GetMapping("/{id}/rounds/current")
-    Responses.Round currentRound(@PathVariable UUID id) {
+    Responses.Round currentRound(Actor actor, @PathVariable UUID id) {
         TournamentView view = queries.getTournament(new TournamentId(id));
         return view.tournament().currentRound()
-                .map(round -> RestMapper.round(view, round))
+                .map(round -> RestMapper.round(view, round, actor))
                 .orElseThrow(() -> new NotFoundException("Es läuft noch keine Runde"));
     }
 }

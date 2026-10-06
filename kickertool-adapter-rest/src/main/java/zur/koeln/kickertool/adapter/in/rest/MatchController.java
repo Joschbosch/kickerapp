@@ -48,14 +48,14 @@ class MatchController {
         return view.tournament().rounds().stream()
                 .flatMap(round -> round.matches().stream())
                 .filter(match -> match.sideOf(actor.playerId()).isPresent())
-                .map(match -> RestMapper.match(view, match))
+                .map(match -> RestMapper.match(view, match, actor))
                 .toList();
     }
 
     @Operation(summary = "Ein Match abrufen")
     @GetMapping("/{matchId}")
-    Responses.Match get(@PathVariable UUID tournamentId, @PathVariable UUID matchId) {
-        return matchOf(queries.getTournament(new TournamentId(tournamentId)), matchId);
+    Responses.Match get(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId) {
+        return matchOf(queries.getTournament(new TournamentId(tournamentId)), matchId, actor);
     }
 
     @Operation(summary = "Ergebnis eintragen",
@@ -66,7 +66,7 @@ class MatchController {
     Responses.Match propose(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId,
             @Valid @RequestBody Requests.Result request) {
         return matchOf(results.submitResult(actor, new TournamentId(tournamentId), new MatchId(matchId),
-                request.toDomain()), matchId);
+                request.toDomain()), matchId, actor);
     }
 
     @Operation(summary = "Ergebnis bestätigen",
@@ -74,7 +74,7 @@ class MatchController {
                     + "eintragende Team kann nicht selbst bestätigen (403).")
     @PostMapping("/{matchId}/result-proposal/confirmation")
     Responses.Match confirm(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId) {
-        return matchOf(results.confirmResult(actor, new TournamentId(tournamentId), new MatchId(matchId)), matchId);
+        return matchOf(results.confirmResult(actor, new TournamentId(tournamentId), new MatchId(matchId)), matchId, actor);
     }
 
     @Operation(summary = "Ergebnis ablehnen",
@@ -82,7 +82,7 @@ class MatchController {
                     + "`DISPUTED`, der Admin legt das Ergebnis fest.")
     @PostMapping("/{matchId}/result-proposal/rejection")
     Responses.Match reject(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId) {
-        return matchOf(results.rejectResult(actor, new TournamentId(tournamentId), new MatchId(matchId)), matchId);
+        return matchOf(results.rejectResult(actor, new TournamentId(tournamentId), new MatchId(matchId)), matchId, actor);
     }
 
     @Operation(summary = "Ergebnis als Admin festlegen oder korrigieren",
@@ -93,12 +93,12 @@ class MatchController {
     Responses.Match decide(Actor actor, @PathVariable UUID tournamentId, @PathVariable UUID matchId,
             @Valid @RequestBody Requests.Result request) {
         return matchOf(results.decideResult(actor, new TournamentId(tournamentId), new MatchId(matchId),
-                request.toDomain()), matchId);
+                request.toDomain()), matchId, actor);
     }
 
-    private static Responses.Match matchOf(TournamentView view, UUID matchId) {
+    private static Responses.Match matchOf(TournamentView view, UUID matchId, Actor actor) {
         return view.tournament().findMatch(new MatchId(matchId))
-                .map(match -> RestMapper.match(view, match))
+                .map(match -> RestMapper.match(view, match, actor))
                 .orElseThrow(() -> new NotFoundException("Match nicht gefunden: " + matchId));
     }
 }

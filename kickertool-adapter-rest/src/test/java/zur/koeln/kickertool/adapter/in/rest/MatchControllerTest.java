@@ -22,8 +22,10 @@ import zur.koeln.kickertool.application.Actor;
 import zur.koeln.kickertool.application.ForbiddenException;
 import zur.koeln.kickertool.domain.NotPermittedException;
 import zur.koeln.kickertool.domain.player.Player;
+import zur.koeln.kickertool.domain.player.PlayerId;
 import zur.koeln.kickertool.domain.tournament.Match;
 import zur.koeln.kickertool.domain.tournament.MatchResult;
+import zur.koeln.kickertool.domain.tournament.NearestRankStandInSuggester;
 
 class MatchControllerTest extends ControllerTestBase {
 
@@ -58,6 +60,85 @@ class MatchControllerTest extends ControllerTestBase {
                 .andExpect(jsonPath("$.teamA.members", hasSize(2)))
                 .andExpect(jsonPath("$.teamB.members", hasSize(2)))
                 .andExpect(jsonPath("$.result").doesNotExist());
+    }
+
+    // ---------------------------------------------------------------- Berechtigungen für den Aufrufer
+
+    private static final String SEITE = "$.mySide";
+
+    @Test
+    void flagsTellAPlayerAtTheTableThatHeMayEnterAResult() throws Exception {
+        playerOfFirstMatch();
+
+        mvc.perform(get(base + "/{m}", tournamentId, matchId).with(user()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(SEITE).value("A"))
+                .andExpect(jsonPath("$.permissions.canEnterResult").value(true))
+                .andExpect(jsonPath("$.permissions.canConfirm").value(false))
+                .andExpect(jsonPath("$.permissions.canReject").value(false))
+                .andExpect(jsonPath("$.permissions.canDecide").value(false));
+    }
+
+    @Test
+    void flagsAreAllFalseForSomeoneWhoIsNotInTheMatch() throws Exception {
+        mvc.perform(get(base + "/{m}", tournamentId, matchId).with(user()))
+                .andExpect(jsonPath(SEITE).doesNotExist())
+                .andExpect(jsonPath("$.permissions.canEnterResult").value(false))
+                .andExpect(jsonPath("$.permissions.canConfirm").value(false))
+                .andExpect(jsonPath("$.permissions.canDecide").value(false));
+    }
+
+    @Test
+    void onlyTheOpposingTeamMayConfirmOrRejectAfterAResultWasEntered() throws Exception {
+        PlayerId enteringPlayer = firstMatch.teamA().actingPlayers().get(0);
+        PlayerId partner = firstMatch.teamA().actingPlayers().size() > 1 ? firstMatch.teamA().actingPlayers().get(1) : null;
+        PlayerId opponent = firstMatch.teamB().actingPlayers().get(0);
+        data.tournament().submitResult(firstMatch.id(), enteringPlayer, new MatchResult(10, 6),
+                new NearestRankStandInSuggester());
+
+        Player enteringUser = playerNamed(enteringPlayer);
+        when(players.provision(any(), any())).thenReturn(enteringUser);
+        mvc.perform(get(base + "/{m}", tournamentId, matchId).with(user()))
+                .andExpect(jsonPath("$.permissions.canEnterResult").value(false))
+                .andExpect(jsonPath("$.permissions.canConfirm").value(false));
+
+        if (partner != null) {
+            when(players.provision(any(), any())).thenReturn(playerNamed(partner));
+            mvc.perform(get(base + "/{m}", tournamentId, matchId).with(user()))
+                    // Partner des Eintragenden darf nicht bestätigen
+                    .andExpect(jsonPath("$.permissions.canConfirm").value(false));
+        }
+
+        when(players.provision(any(), any())).thenReturn(playerNamed(opponent));
+        mvc.perform(get(base + "/{m}", tournamentId, matchId).with(user()))
+                .andExpect(jsonPath(SEITE).value("B"))
+                .andExpect(jsonPath("$.permissions.canConfirm").value(true))
+                .andExpect(jsonPath("$.permissions.canReject").value(true));
+    }
+
+    @Test
+    void adminMayDecideRunningMatchesButNotWaitingOnes() throws Exception {
+        Match waiting = data.tournament().rounds().get(0).matches().get(2);
+
+        mvc.perform(get(base + "/{m}", tournamentId, matchId).with(admin()))
+                .andExpect(jsonPath("$.permissions.canDecide").value(true))
+                .andExpect(jsonPath("$.permissions.canEnterResult").value(false));
+        mvc.perform(get(base + "/{m}", tournamentId, waiting.id()).with(admin()))
+                .andExpect(jsonPath("$.status").value("QUEUED"))
+                .andExpect(jsonPath("$.permissions.canDecide").value(false));
+    }
+
+    @Test
+    void flagsAppearInTheTournamentViewToo() throws Exception {
+        playerOfFirstMatch();
+
+        mvc.perform(get("/api/tournaments/{id}", tournamentId).with(user()))
+                .andExpect(jsonPath("$.currentRound.matches[0].permissions.canEnterResult").value(true))
+                .andExpect(jsonPath("$.currentRound.matches[1].permissions.canEnterResult").value(false));
+    }
+
+    private Player playerNamed(PlayerId id) {
+        return data.players().stream().filter(p -> p.id().equals(id)).findFirst().orElseThrow();
     }
 
     @Test
