@@ -99,6 +99,37 @@ class LocalProfileTest {
         assertThat(jwks.obj().toString()).doesNotContain("\"d\"");
     }
 
+    private HttpResponse<String> preflight(String path, String method) throws Exception {
+        HttpRequest request = request(path)
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+                .header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", method)
+                .header("Access-Control-Request-Headers", "content-type,authorization")
+                .build();
+        return http.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
+    void aBrowserUiOnAnotherLocalPortMayUseTheMockLoginAndTheApi() throws Exception {
+        HttpResponse<String> token = preflight("/mock-oidc/token", "POST");
+        assertThat(token.statusCode()).isEqualTo(200);
+        assertThat(token.headers().firstValue("Access-Control-Allow-Origin")).isPresent();
+        assertThat(token.headers().firstValue("Access-Control-Allow-Methods").orElse("")).contains("POST");
+
+        HttpResponse<String> discovery = preflight("/mock-oidc/.well-known/openid-configuration", "GET");
+        assertThat(discovery.headers().firstValue("Access-Control-Allow-Origin")).isPresent();
+
+        HttpResponse<String> api = preflight("/api/tournaments", "POST");
+        assertThat(api.statusCode()).isEqualTo(200);
+        assertThat(api.headers().firstValue("Access-Control-Allow-Origin")).contains("http://localhost:5173");
+
+        HttpResponse<String> stranger = http.send(request("/api/tournaments")
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+                .header("Origin", "http://boese.example")
+                .header("Access-Control-Request-Method", "GET").build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(stranger.statusCode()).isEqualTo(403);
+    }
+
     @Test
     void logsInWithPasswordFlowAndCallsTheApi() {
         Response login = login("anna", "anna");

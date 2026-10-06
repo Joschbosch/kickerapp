@@ -12,3 +12,5 @@ CLAUDE.md
 docker-compose.yml
 Dockerfile
 .dockerignore
+docs/
+AGENTS.md

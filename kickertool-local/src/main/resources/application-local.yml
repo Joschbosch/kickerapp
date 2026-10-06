@@ -12,3 +12,8 @@ spring:
           # Nur für die Swagger-UI-Anmeldung (Discovery). Die Tokens prüft die App direkt mit dem Schlüssel des
           # simulierten Providers.
           issuer-uri: http://localhost:${server.port:8080}/mock-oidc
+
+kickertool:
+  cors:
+    # Eine UI im Entwicklungsmodus (Vite, Angular, Next, ...) auf jedem lokalen Port darf die API aufrufen.
+    allowed-origins: ${KICKERTOOL_CORS_ALLOWED_ORIGINS:http://localhost:[*],http://127.0.0.1:[*]}

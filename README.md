@@ -33,6 +33,8 @@ kickertool-adapter-events       ausgehend: Verteilung der Live-Update-Events (In
 kickertool-local                nur für lokale Tests: simulierter OIDC-Provider, Testnutzer, Demo-Turnier (nur mit Profil "local")
 Dockerfile, docker-compose.yml  Container-Image und Entwicklungsumgebung mit Docker
 helm/kickertool                 Helm-Chart: App, PostgreSQL und Keycloak im Kubernetes-Cluster
+docs/                           Übergabe für UI-Entwicklung, API-Vertrag (openapi.json), Vorlage für das UI-Repo
+AGENTS.md, CLAUDE.md            Projektregeln für KI-Assistenten (Codex, Claude Code); CLAUDE.md verweist auf AGENTS.md
 kickertool-bootstrap            startbare Spring-Boot-App, verdrahtet alles
 ```
 
@@ -49,6 +51,7 @@ Registrierung und Login übernimmt der OIDC-Provider. Die API ist ein **Resource
 | Rolle, die zum Admin macht | `KICKERTOOL_ADMIN_ROLE` | `kicker-admin` |
 | Datenbank | `KICKERTOOL_DB_URL`, `_USER`, `_PASSWORD` | lokales Postgres, `kickertool` |
 | Swagger UI und OpenAPI-Doku | `KICKERTOOL_OPENAPI_ENABLED` | `true` (in Produktion `false`) |
+| Erlaubte Browser-Adressen (CORS), kommagetrennt | `KICKERTOOL_CORS_ALLOWED_ORIGINS` | leer = nur dieselbe Adresse. Muster wie `https://*.example.com` oder `http://localhost:[*]` sind erlaubt |
 
 Der Claim-Pfad darf verschachtelt sein (`resource_access.<client>.roles`), eine Zeichenkette wird an Leerzeichen getrennt. Damit läuft die App mit jedem OIDC-Provider, der JWT-Access-Tokens ausstellt.
 
@@ -96,13 +99,14 @@ Zum schnellen Ausprobieren braucht es weder Postgres noch Keycloak. Das Maven-Pr
 .\scripts\run-local.ps1
 ```
 
-(Linux/macOS: `./scripts/run-local.sh`.) Das Skript installiert alle Module und startet `.\mvnw.cmd -pl kickertool-bootstrap -Plocal spring-boot:run`. In IntelliJ: Maven-Profil `local` aktivieren und die Spring-Profile `local` setzen.
+(Linux/macOS: `./scripts/run-local.sh`.) Anderer Port: `.\scripts\run-local.ps1 -Port 9090` bzw. `PORT=9090 ./scripts/run-local.sh`. Das Skript prüft Java 21 und den Port, installiert alle Module und startet `.\mvnw.cmd -pl kickertool-bootstrap -Plocal spring-boot:run`. In IntelliJ: Maven-Profil `local` aktivieren und die Spring-Profile `local` setzen.
 
 Danach ist alles unter http://localhost:8080/swagger-ui.html erreichbar:
 
 - **Anmelden:** **Authorize**, dann `oidc` (Password-Flow), Benutzername = Passwort. Die `client_id` ist vorbelegt, ein Secret ist nicht nötig.
 - **Benutzer:** `admin` (Admin-Rechte) und die Spieler `anna`, `ben`, `clara`, `david`, `emma`, `felix`, `greta`, `hans`, `ida`, `jonas`.
 - **Demo-Turnier:** "Demo-Turnier" mit allen 10 Spielern angemeldet, 3 Tische, noch nicht gestartet. Als `admin` `…/start` und `…/rounds` aufrufen, dann als Spieler `…/matches/mine`, Ergebnis eintragen und als Gegner bestätigen. Für den Wechsel zwischen Spielern erneut **Authorize** (erst **Logout**).
+- **UI auf anderer Adresse:** Im lokalen Modus ist CORS für jeden lokalen Port freigegeben (`http://localhost:[*]`), auch am simulierten Login. Eine UI auf Vite, Angular oder Next kann also direkt gegen die App arbeiten.
 - **Tokens per Hand:** `curl -d "grant_type=password&username=anna&password=anna" http://localhost:8080/mock-oidc/token`
 - Die Datenbank liegt im Speicher, nach jedem Neustart ist alles frisch. Die Tokens gelten nur bis zum nächsten Neustart.
 
@@ -152,12 +156,24 @@ Dann http://localhost:8080/swagger-ui.html, Anmeldung mit `anna`/`anna` (Passwor
 | `postgresql.enabled=false` + `database.*` | Eigene oder verwaltete Datenbank statt der eingebauten |
 | `keycloak.enabled=false` + `oidc.issuerUri` | Eigener OIDC-Provider statt Keycloak |
 | `app.openapi` | Swagger UI und API-Doku an oder aus |
+| `app.corsAllowedOrigins` | Browser-Adressen einer UI auf anderer Adresse (CORS), z. B. `https://turnier.example.com` |
 
 **Admin-Rechte** bekommt, wem in Keycloak die Realm-Rolle `kicker-admin` zugewiesen ist (Admin-Konsole unter `keycloak.hostname`, Passwort steht im Secret, siehe Ausgabe von `helm install`).
 
 **Für eine echte Umgebung:** HTTPS über den Ingress und `keycloak.sslRequired: external`, `demoUsers` und `directAccessGrants` aus, `redirectUris` ohne Platzhalter, Passwörter über `existingSecret` oder zufällig erzeugen lassen (leere Werte), `app.openapi: false`. Die eingebaute PostgreSQL ist eine einfache Einzelinstanz ohne Backup, besser eine verwaltete Datenbank mit `postgresql.enabled=false`. `replicaCount` bei 1 lassen, weil die Live-Updates im Speicher der Instanz verteilt werden. Mehrere Replikas bräuchten einen anderen `TournamentEventBus`-Adapter (z. B. Redis).
 
 **Geprüft:** Image-Bau, Compose-Stack mit echtem Keycloak und PostgreSQL (Realm-Import, Login, Admin-Rolle, 401/403), Helm-Lint und Server-Dry-Run, Installation auf einem k3s-Cluster mit Login, Turnier anlegen und Anmelden, Neustart von PostgreSQL ohne Datenverlust, `helm test`. **Nicht geprüft:** Ingress, TLS und ein Betrieb hinter einem Reverse Proxy.
+## Für die UI-Entwicklung
+
+Die UI liegt in einem eigenen Repo. Alles, was dafür nötig ist, steht in [`docs/ui-uebergabe.md`](docs/ui-uebergabe.md):
+Backend lokal starten, Anmeldung, Zustände, Live-Updates, bekannte Lücken und offene Entscheidungen. Dazu:
+
+- [`docs/openapi.json`](docs/openapi.json) ist der eingecheckte **API-Vertrag**. Daraus lassen sich Clients erzeugen oder
+  ein Mock-Server starten. `OpenApiSnapshotTest` hält die Datei aktuell (Neuerzeugen: siehe `AGENTS.md`).
+- [`docs/ui-vorlage/AGENTS.md`](docs/ui-vorlage/AGENTS.md) ist eine Vorlage für die Projektregeln im UI-Repo, für Codex und
+  Claude Code.
+- Die Matches enthalten für den Aufrufer berechnete `permissions` (`canEnterResult`, `canConfirm`, `canReject`,
+  `canDecide`) und `mySide`, damit die UI die Regeln nicht nachbauen muss.
 ## REST-API
 
 Alle Endpunkte liegen unter `/api` und verlangen ein Token. Fehler kommen als `application/problem+json`:
@@ -200,6 +216,7 @@ Als Spieler-ID kann überall `me` stehen.
 
 - Domäne, Anwendungsschicht, Events, REST (MockMvc), Architekturregeln: laufen überall.
 - Persistenz-Tests laufen gegen H2. `PostgresPersistenceTest` prüft Flyway und Mapping gegen echtes PostgreSQL und braucht Docker, sonst wird er übersprungen.
+- `OpenApiSnapshotTest` vergleicht die laufende API mit `docs/openapi.json` und schlägt bei Abweichung fehl. Die CORS-Regeln prüfen `CorsTest` und `LocalProfileTest`.
 - `KickertoolEndToEndTest` spielt ein komplettes Turnier über HTTP durch (10 Spieler, 2 Tische, Dummy-Match, Ergebnisse mit Bestätigung, Admin-Korrektur, Pause, SSE) und ersetzt den OIDC-Provider durch Test-Tokens.
 
 

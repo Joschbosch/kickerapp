@@ -54,7 +54,7 @@ class ParticipantController {
                 ? new PlayerId(request.playerId())
                 : actor.playerId();
         TournamentView view = participation.register(actor, new TournamentId(tournamentId), player);
-        return ResponseEntity.status(HttpStatus.CREATED).body(RestMapper.tournament(view));
+        return ResponseEntity.status(HttpStatus.CREATED).body(RestMapper.tournament(view, actor));
     }
 
     @Operation(summary = "Vom Turnier abmelden", description = "Nur vor dem Start. Danach gibt es nur Pause oder Ausscheiden.")
@@ -62,7 +62,7 @@ class ParticipantController {
     Responses.Tournament unregister(Actor actor, @PathVariable UUID tournamentId,
             @Parameter(description = PLAYER_ID_HELP) @PathVariable String playerId) {
         return RestMapper.tournament(
-                participation.unregister(actor, new TournamentId(tournamentId), resolve(playerId, actor)));
+                participation.unregister(actor, new TournamentId(tournamentId), resolve(playerId, actor)), actor);
     }
 
     @Operation(summary = "Teilnahmestatus ändern",
@@ -80,7 +80,7 @@ class ParticipantController {
             case ACTIVE -> participation.resume(actor, tournament, player);
             case WITHDRAWN -> participation.withdraw(actor, tournament, player);
         };
-        return RestMapper.tournament(view);
+        return RestMapper.tournament(view, actor);
     }
 
     private static PlayerId resolve(String value, Actor actor) {

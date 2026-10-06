@@ -177,6 +177,22 @@ public final class Match {
         return Optional.empty();
     }
 
+    /** Darf der Spieler jetzt ein Ergebnis eintragen? Er muss am Tisch stehen, das Match muss gerade spielen. */
+    public boolean canEnterResult(PlayerId player) {
+        return status == MatchStatus.ON_TABLE && sideOf(player).isPresent();
+    }
+
+    /** Darf der Spieler das eingetragene Ergebnis bestätigen oder ablehnen? Nur das Gegnerteam des Eintragenden. */
+    public boolean canRespondToResult(PlayerId player) {
+        return status == MatchStatus.RESULT_ENTERED
+                && sideOf(player).filter(side -> side != resultEnteredSide).isPresent();
+    }
+
+    /** Kann ein Admin ein Ergebnis festlegen oder korrigieren? Ab dem Moment, in dem das Match spielt. */
+    public boolean canBeDecidedByAdmin() {
+        return status != MatchStatus.QUEUED;
+    }
+
     private Side requireSideOf(PlayerId player) {
         return sideOf(player).orElseThrow(
                 () -> new NotPermittedException("Der Spieler gehört nicht zu diesem Match"));

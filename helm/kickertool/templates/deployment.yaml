@@ -71,6 +71,10 @@ spec:
               value: {{ .Values.app.adminClaim | quote }}
             - name: KICKERTOOL_ADMIN_ROLE
               value: {{ .Values.app.adminRole | quote }}
+            {{- with .Values.app.corsAllowedOrigins }}
+            - name: KICKERTOOL_CORS_ALLOWED_ORIGINS
+              value: {{ join "," . | quote }}
+            {{- end }}
             - name: KICKERTOOL_OPENAPI_ENABLED
               value: {{ .Values.app.openapi | quote }}
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED

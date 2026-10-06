@@ -22,6 +22,9 @@ app:
   # Wo im Token steht, ob jemand Admin ist. Die Defaults passen zu Keycloak-Realm-Rollen.
   adminClaim: realm_access.roles
   adminRole: kicker-admin
+  # Adressen von Web-Oberflächen, die die API aus dem Browser aufrufen dürfen (CORS), z. B. https://turnier.example.com.
+  # Leer = nur dieselbe Adresse. Muster wie https://*.example.com und http://localhost:[*] sind erlaubt.
+  corsAllowedOrigins: []
   # Weitere Umgebungsvariablen, z. B. - {name: LOGGING_LEVEL_ZUR_KOELN, value: DEBUG}
   extraEnv: []
   resources:

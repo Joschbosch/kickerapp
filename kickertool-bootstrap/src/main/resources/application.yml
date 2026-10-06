@@ -21,6 +21,10 @@ kickertool:
     # Wo im Token steht, ob jemand Admin ist. Defaults passen zu Keycloak-Realm-Rollen.
     admin-claim: ${KICKERTOOL_ADMIN_CLAIM:realm_access.roles}
     admin-role: ${KICKERTOOL_ADMIN_ROLE:kicker-admin}
+  cors:
+    # Adressen von Web-Oberflächen, die die API aus dem Browser aufrufen dürfen (kommagetrennt, z. B.
+    # https://turnier.example.com). Leer = nur dieselbe Adresse.
+    allowed-origins: ${KICKERTOOL_CORS_ALLOWED_ORIGINS:}
 
 management:
   endpoints:

@@ -54,7 +54,26 @@ public final class Responses {
             @Schema(description = "Tischnummer, null solange das Match wartet", nullable = true) Integer table,
             Team teamA, Team teamB,
             @Schema(description = "Eingetragenes oder festgelegtes Ergebnis, null solange keines vorliegt",
-                    nullable = true) Result result) {
+                    nullable = true) Result result,
+            @Schema(description = "Auf welcher Seite der Aufrufer steht (auch als Einspringer), null wenn gar nicht",
+                    nullable = true) Side mySide,
+            @Schema(description = "Was der Aufrufer mit diesem Match jetzt tun darf") MatchPermissions permissions) {
+    }
+
+    /**
+     * Was der anfragende Spieler mit einem Match jetzt tun darf. Clients zeigen Buttons anhand dieser Flags und
+     * müssen die Regeln (Gegnerteam bestätigt, nur am Tisch eintragen, Admin entscheidet) nicht nachbauen. Die
+     * Flags sind für den Aufrufer berechnet, die Antwort eines Spielers taugt also nicht für andere.
+     */
+    public record MatchPermissions(
+            @Schema(description = "Ergebnis eintragen: Match läuft am Tisch und der Aufrufer steht dort")
+            boolean canEnterResult,
+            @Schema(description = "Ergebnis bestätigen: ein Ergebnis steht und der Aufrufer gehört zum Gegnerteam")
+            boolean canConfirm,
+            @Schema(description = "Ergebnis ablehnen: gleiche Bedingung wie canConfirm")
+            boolean canReject,
+            @Schema(description = "Ergebnis festlegen oder korrigieren: Aufrufer ist Admin, Match läuft oder ist gespielt")
+            boolean canDecide) {
     }
 
     public record Team(List<Slot> members) {
