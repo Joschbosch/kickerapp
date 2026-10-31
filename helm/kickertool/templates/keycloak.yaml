@@ -42,8 +42,8 @@ data:
           "publicClient": true,
           "standardFlowEnabled": true,
           "directAccessGrantsEnabled": {{ .Values.keycloak.directAccessGrants }},
-          "redirectUris": {{ toJson .Values.keycloak.redirectUris }},
-          "webOrigins": {{ toJson .Values.keycloak.webOrigins }},
+          "redirectUris": {{ include "kickertool.redirectUris" . }},
+          "webOrigins": {{ include "kickertool.webOrigins" . }},
           "attributes": {
             "pkce.code.challenge.method": "S256"
           }
@@ -154,7 +154,7 @@ spec:
                   key: password
             # Externe Adresse: daraus entsteht der Aussteller (iss) im Token
             - name: KC_HOSTNAME
-              value: {{ .Values.keycloak.hostname | quote }}
+              value: {{ include "kickertool.keycloakHostname" . | quote }}
             - name: KC_HTTP_ENABLED
               value: "true"
             - name: KC_HEALTH_ENABLED

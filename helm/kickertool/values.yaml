@@ -5,6 +5,16 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# Gemeinsame Werte, die das Gesamt-Chart `kickertool-stack` (im UI-Repo) für alle Teile setzt. Sie haben Vorrang vor
+# keycloak.hostname, ingress.host und ingress.keycloakHost. Beim Einzelbetrieb leer lassen.
+#   global.host:          Host der UI und der API, z. B. turnier.example.com
+#   global.authHost:      Host von Keycloak, z. B. auth.example.com
+#   global.tls:           HTTPS (Adressen mit https://, TLS-Abschnitt am Ingress)
+#   global.tlsSecretName: Secret mit dem Zertifikat, leer = Standardzertifikat des Ingress
+#   global.ingressClassName: Klasse des Ingress (ersetzt nur ein leeres ingress.className)
+# Die UI am gemeinsamen Host wird in Keycloak als Weiterleitung und Web-Origin erlaubt.
+global: {}
+
 image:
   repository: kickertool
   # leer = appVersion aus Chart.yaml
@@ -122,6 +132,9 @@ ingress:
   annotations: {}
   # Host der App
   host: ""
+  # Pfade, die zur App gehen. Standard: alles. Teilt sich die App den Host mit einer UI, nur die API, z. B.
+  # [/api, /swagger-ui, /swagger-ui.html, /v3/api-docs].
+  paths: ["/"]
   # Host von Keycloak, leer = nicht über den Ingress erreichbar
   keycloakHost: ""
   tls: []

@@ -154,7 +154,8 @@ Dann http://localhost:8080/swagger-ui.html, Anmeldung mit `anna`/`anna` (Passwor
 | `image.repository`, `image.tag` | Das Image. `tag` leer = Version des Charts |
 | `keycloak.hostname` | Externe Adresse von Keycloak, wie der Browser sie aufruft. Daraus wird der Aussteller (`iss`) im Token. Muss zur echten Adresse passen, sonst weist die App Tokens ab |
 | `keycloak.redirectUris`, `webOrigins` | Erlaubte Rückleitungen nach dem Login (z. B. Swagger UI, später die App) |
-| `ingress.*` | Zugang von außen mit `host` für die App und `keycloakHost` für Keycloak, dazu `keycloak.proxyHeaders: xforwarded` |
+| `ingress.*` | Zugang von außen mit `host` für die App und `keycloakHost` für Keycloak, dazu `keycloak.proxyHeaders: xforwarded`. `ingress.paths` (Standard `/`) schränkt ein, welche Pfade zur App gehen, wenn eine UI denselben Host bekommt |
+| `global.*` | Gemeinsame Adressen für das Gesamt-Chart `kickertool-stack` (im Repo `kickerapp-ui`): `host`, `authHost`, `tls`, `tlsSecretName`, `ingressClassName`. Sie ersetzen `keycloak.hostname`, `ingress.host` und `ingress.keycloakHost` und erlauben die UI in Keycloak. Im Einzelbetrieb leer |
 | `postgresql.enabled=false` + `database.*` | Eigene oder verwaltete Datenbank statt der eingebauten |
 | `keycloak.enabled=false` + `oidc.issuerUri` | Eigener OIDC-Provider statt Keycloak |
 | `app.openapi` | Swagger UI und API-Doku an oder aus |

@@ -3,10 +3,10 @@ Kickertool {{ .Chart.AppVersion }} wurde als "{{ .Release.Name }}" in "{{ .Relea
 {{- if .Values.ingress.enabled }}
 
 Erreichbar über den Ingress:
-  App:        http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
-  Swagger UI: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}/swagger-ui.html
-{{- if and .Values.keycloak.enabled .Values.ingress.keycloakHost }}
-  Keycloak:   {{ .Values.keycloak.hostname }}  (ingress.keycloakHost: {{ .Values.ingress.keycloakHost }})
+  App:        http{{ if include "kickertool.ingressTls" . }}s{{ end }}://{{ include "kickertool.ingressHost" . }}
+  Swagger UI: http{{ if include "kickertool.ingressTls" . }}s{{ end }}://{{ include "kickertool.ingressHost" . }}/swagger-ui.html
+{{- if and .Values.keycloak.enabled (include "kickertool.ingressKeycloakHost" .) }}
+  Keycloak:   {{ include "kickertool.keycloakHostname" . }}  (Ingress-Host: {{ include "kickertool.ingressKeycloakHost" . }})
 {{- end }}
 {{- else }}
 
@@ -23,7 +23,7 @@ Dann: http://localhost:8080/swagger-ui.html
 Keycloak
   Aussteller im Token: {{ include "kickertool.issuerUri" . }}
   Dieser Wert muss genau der Adresse entsprechen, unter der Clients Keycloak aufrufen (keycloak.hostname).
-  Admin-Konsole:       {{ .Values.keycloak.hostname }}  Benutzer "{{ .Values.keycloak.adminUser }}", Passwort:
+  Admin-Konsole:       {{ include "kickertool.keycloakHostname" . }}  Benutzer "{{ .Values.keycloak.adminUser }}", Passwort:
     kubectl -n {{ .Release.Namespace }} get secret {{ include "kickertool.keycloakName" . }} -o jsonpath='{.data.admin-password}' | base64 -d
   Admin-Rechte in der App: dem Benutzer in Keycloak die Realm-Rolle "{{ .Values.app.adminRole }}" geben.
 {{- if .Values.keycloak.demoUsers }}

@@ -69,10 +69,64 @@ app.kubernetes.io/component: {{ .component }}
 {{- if .Values.postgresql.enabled }}{{ .Values.postgresql.username }}{{ else }}{{ required "database.username ist nötig, wenn postgresql.enabled=false" .Values.database.username }}{{ end }}
 {{- end }}
 
+{{/*
+Gemeinsame Adressen aus dem Gesamt-Chart (global.host, global.authHost, global.tls, global.tlsSecretName). Sie haben Vorrang vor
+den eigenen Einstellungen (keycloak.hostname, ingress.host, ingress.keycloakHost). Ohne sie bleibt alles beim Alten.
+*/}}
+{{- define "kickertool.scheme" -}}
+{{- if (default dict .Values.global).tls }}https{{ else }}http{{ end }}
+{{- end }}
+
+{{- define "kickertool.ingressHost" -}}
+{{- default .Values.ingress.host (default dict .Values.global).host }}
+{{- end }}
+
+{{- define "kickertool.ingressKeycloakHost" -}}
+{{- default .Values.ingress.keycloakHost (default dict .Values.global).authHost }}
+{{- end }}
+
+{{/* Externe Adresse von Keycloak, so wie der Browser sie aufruft */}}
+{{- define "kickertool.keycloakHostname" -}}
+{{- $g := default dict .Values.global }}
+{{- if $g.authHost }}{{ printf "%s://%s" (include "kickertool.scheme" .) $g.authHost }}{{ else }}{{ .Values.keycloak.hostname }}{{ end }}
+{{- end }}
+
+{{/* Erlaubte Weiterleitungen und Web-Origins von Keycloak: die eigenen plus die der UI am gemeinsamen Host (als JSON) */}}
+{{- define "kickertool.redirectUris" -}}
+{{- $uris := default (list) .Values.keycloak.redirectUris }}
+{{- with (default dict .Values.global).host }}
+{{- $uris = append $uris (printf "%s://%s/*" (include "kickertool.scheme" $) .) }}
+{{- end }}
+{{- toJson $uris }}
+{{- end }}
+
+{{- define "kickertool.webOrigins" -}}
+{{- $origins := default (list) .Values.keycloak.webOrigins }}
+{{- with (default dict .Values.global).host }}
+{{- $origins = append $origins (printf "%s://%s" (include "kickertool.scheme" $) .) }}
+{{- end }}
+{{- toJson $origins }}
+{{- end }}
+
+{{/* TLS-Abschnitt des Ingress (als YAML): eigene Angabe, sonst aus global.tls mit beiden Hosts, sonst leer */}}
+{{- define "kickertool.ingressTls" -}}
+{{- $g := default dict .Values.global }}
+{{- if .Values.ingress.tls }}
+{{- toYaml .Values.ingress.tls }}
+{{- else if $g.tls }}
+{{- $hosts := list }}
+{{- with (include "kickertool.ingressHost" .) }}{{ $hosts = append $hosts . }}{{ end }}
+{{- with (include "kickertool.ingressKeycloakHost" .) }}{{ $hosts = append $hosts . }}{{ end }}
+{{- $entry := dict "hosts" $hosts }}
+{{- with $g.tlsSecretName }}{{ $_ := set $entry "secretName" . }}{{ end }}
+{{- toYaml (list $entry) }}
+{{- end }}
+{{- end }}
+
 {{/* Aussteller des Tokens, so wie ihn der Browser sieht */}}
 {{- define "kickertool.issuerUri" -}}
 {{- if .Values.keycloak.enabled }}
-{{- printf "%s/realms/%s" (trimSuffix "/" .Values.keycloak.hostname) .Values.keycloak.realm }}
+{{- printf "%s/realms/%s" (trimSuffix "/" (include "kickertool.keycloakHostname" .)) .Values.keycloak.realm }}
 {{- else }}
 {{- required "oidc.issuerUri ist nötig, wenn keycloak.enabled=false" .Values.oidc.issuerUri }}
 {{- end }}
