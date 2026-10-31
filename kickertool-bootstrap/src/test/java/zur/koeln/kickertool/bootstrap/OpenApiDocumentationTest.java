@@ -105,6 +105,41 @@ class OpenApiDocumentationTest {
     }
 
     @Test
+    void requestsHaveTheirOwnSchemasWithRequiredFields() throws Exception {
+        String config = "$.paths['/api/tournaments/{id}/config'].put.requestBody.content['application/json'].schema";
+        String proposal = "$.paths['/api/tournaments/{tournamentId}/matches/{matchId}/result-proposal'].post.requestBody"
+                + ".content['application/json'].schema";
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(jsonPath(config + ".$ref").value("#/components/schemas/ConfigRequest"))
+                .andExpect(jsonPath("$.components.schemas.ConfigRequest.required").value(
+                        org.hamcrest.Matchers.hasItems("tableCount", "pointsWin", "goalLimit", "randomRounds")))
+                .andExpect(jsonPath(proposal + ".$ref").value("#/components/schemas/ResultRequest"))
+                .andExpect(jsonPath("$.components.schemas.ResultRequest.required").value(
+                        org.hamcrest.Matchers.containsInAnyOrder("goalsA", "goalsB")))
+                .andExpect(jsonPath("$.components.schemas", hasKey("Config")))
+                .andExpect(jsonPath("$.components.schemas", hasKey("Result")));
+    }
+
+    @Test
+    void responsesDeclareAllFieldsAsRequiredAndNullableReferencesCorrectly() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(jsonPath("$.components.schemas.Match.required").value(org.hamcrest.Matchers.hasItems(
+                        "id", "status", "table", "teamA", "teamB", "result", "mySide", "permissions")))
+                .andExpect(jsonPath("$.components.schemas.Config.required").value(
+                        org.hamcrest.Matchers.hasItems("tableCount", "plannedRounds", "randomRounds")))
+                .andExpect(jsonPath("$.components.schemas.Tournament.required").value(
+                        org.hamcrest.Matchers.hasItems("currentRound", "participants", "config")))
+                // nullbar als oneOf, nicht als Verweis mit type null
+                .andExpect(jsonPath("$.components.schemas.Match.properties.result.oneOf[0].$ref")
+                        .value("#/components/schemas/Result"))
+                .andExpect(jsonPath("$.components.schemas.Match.properties.result.oneOf[1].type").value("null"))
+                .andExpect(jsonPath("$.components.schemas.Tournament.properties.currentRound.oneOf[1].type")
+                        .value("null"))
+                .andExpect(jsonPath("$.components.schemas.Slot.properties.player.oneOf[1].type").value("null"))
+                .andExpect(jsonPath("$..properties.*[?(@.type == 'null' && @.$ref)]").isEmpty());
+    }
+
+    @Test
     void theLoggedInPlayerIsNotAnApiParameter() throws Exception {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(content().string(not(containsString("\"actor\""))));

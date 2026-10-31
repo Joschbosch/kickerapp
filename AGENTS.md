@@ -42,6 +42,10 @@ Diese Datei gilt für alle Assistenten (Codex, Claude Code, ...). Eigenheiten ei
 - **`docs/openapi.json` ist der eingecheckte Vertrag.** Ändert sich die API, schlägt `OpenApiSnapshotTest` fehl. Neu
   erzeugen: `./mvnw -pl kickertool-bootstrap test -Dtest=OpenApiSnapshotTest -Dopenapi.update=true` und die Datei mit
   einchecken. `OpenApiDocumentationTest` prüft zusätzlich, dass alle Pfade beschrieben sind.
+- Antwortfelder gelten im Vertrag als Pflicht (`required`), außer sie sind `@Schema(nullable = true)`; nullable Verweise
+  erscheinen als `oneOf [Schema, null]`. Das erledigt `OpenApiContractCustomizer`, damit die UI-Typen stimmen. Optionale
+  Anfragefelder deshalb mit `@Schema(nullable = true)` oder `required = false` kennzeichnen. Anfrage- und Antwort-DTOs mit
+  gleichem Namen brauchen verschiedene `@Schema(name = …)` (z. B. `ConfigRequest`).
 - Matches enthalten `mySide` und `permissions` (`canEnterResult`, `canConfirm`, `canReject`, `canDecide`) für den
   Aufrufer, damit Clients die Regeln nicht nachbauen. Die Antworten sind dadurch vom Aufrufer abhängig.
 - CORS: Standardmäßig ist keine Browser-Herkunft erlaubt. Freigabe über `kickertool.cors.allowed-origins`

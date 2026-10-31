@@ -15,6 +15,7 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -75,6 +76,12 @@ public class OpenApiConfiguration {
             api.addSecurityItem(new SecurityRequirement().addList(OIDC));
         }
         return api;
+    }
+
+    /** Macht den Vertrag für typisierte Clients genau: Pflichtfelder der Antworten, korrekt nullbare Verweise. */
+    @Bean
+    OpenApiCustomizer contractCustomizer() {
+        return new OpenApiContractCustomizer();
     }
 
     /** Hängt die möglichen Fehlerantworten an jede Operation, sofern nicht selbst beschrieben. */

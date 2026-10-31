@@ -30,7 +30,11 @@ public final class Requests {
             @Schema(example = "2026-10-05") @NotNull LocalDate date) {
     }
 
-    /** Vollständige Konfiguration. {@code plannedRounds = null} bedeutet: Rundenzahl offen. */
+    /**
+     * Vollständige Konfiguration. {@code plannedRounds = null} bedeutet: Rundenzahl offen. Im API-Vertrag
+     * {@code ConfigRequest}, damit der Name nicht mit der Antwort {@code Config} kollidiert.
+     */
+    @Schema(name = "ConfigRequest")
     public record Config(
             @Schema(description = "Anzahl verfügbarer Tische, gilt ab der nächsten Welle", example = "4")
             @NotNull @Min(1) Integer tableCount,
@@ -64,7 +68,8 @@ public final class Requests {
             @NotNull ParticipantStatus status) {
     }
 
-    @Schema(description = "Endstand eines Matches aus Sicht von Team A und Team B, wie in der Antwort des Matches")
+    /** Im API-Vertrag {@code ResultRequest}, damit der Name nicht mit der Antwort {@code Result} kollidiert. */
+    @Schema(name = "ResultRequest", description = "Endstand eines Matches aus Sicht von Team A und Team B")
     public record Result(
             @Schema(description = "Tore von Team A", example = "10") @NotNull @Min(0) Integer goalsA,
             @Schema(description = "Tore von Team B", example = "7") @NotNull @Min(0) Integer goalsB) {

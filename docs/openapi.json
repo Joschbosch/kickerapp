@@ -47,6 +47,69 @@
             "type" : "integer"
           }
         },
+        "required" : [ "goalLimit", "matchMinutes", "plannedRounds", "pointsDraw", "pointsLoss", "pointsWin", "randomRounds", "tableCount" ],
+        "type" : "object"
+      },
+      "ConfigRequest" : {
+        "properties" : {
+          "goalLimit" : {
+            "description" : "Ein Match endet bei dieser Torzahl (ein Satz)",
+            "example" : 10,
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "matchMinutes" : {
+            "description" : "Maximale Spielzeit in Minuten",
+            "example" : 5,
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "plannedRounds" : {
+            "description" : "Geplante Rundenzahl, nur zur Anzeige. null = offen",
+            "example" : 8,
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : [ "integer", "null" ]
+          },
+          "pointsDraw" : {
+            "description" : "Punkte für ein Unentschieden",
+            "example" : 1,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "pointsLoss" : {
+            "description" : "Punkte für eine Niederlage",
+            "example" : 0,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "pointsWin" : {
+            "description" : "Punkte für einen Sieg",
+            "example" : 3,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "randomRounds" : {
+            "description" : "Die ersten Runden, die komplett zufällig ausgelost werden. Danach wird nach Rangliste ausgelost (Schweizer DYP).",
+            "example" : 2,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "tableCount" : {
+            "description" : "Anzahl verfügbarer Tische, gilt ab der nächsten Welle",
+            "example" : 4,
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "goalLimit", "matchMinutes", "pointsDraw", "pointsLoss", "pointsWin", "randomRounds", "tableCount" ],
         "type" : "object"
       },
       "Event" : {
@@ -68,6 +131,7 @@
             "type" : "string"
           }
         },
+        "required" : [ "id", "matchId", "occurredAt", "type" ],
         "type" : "object"
       },
       "EventTicket" : {
@@ -87,6 +151,7 @@
             "type" : "string"
           }
         },
+        "required" : [ "expiresInSeconds", "streamUrl", "ticket" ],
         "type" : "object"
       },
       "Match" : {
@@ -110,9 +175,12 @@
             "type" : "integer"
           },
           "result" : {
-            "$ref" : "#/components/schemas/Result",
             "description" : "Eingetragenes oder festgelegtes Ergebnis, null solange keines vorliegt",
-            "type" : "null"
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/Result"
+            }, {
+              "type" : "null"
+            } ]
           },
           "round" : {
             "format" : "int32",
@@ -134,6 +202,7 @@
             "$ref" : "#/components/schemas/Team"
           }
         },
+        "required" : [ "id", "mySide", "permissions", "position", "result", "round", "status", "table", "teamA", "teamB" ],
         "type" : "object"
       },
       "MatchPermissions" : {
@@ -155,6 +224,7 @@
             "type" : "boolean"
           }
         },
+        "required" : [ "canConfirm", "canDecide", "canEnterResult", "canReject" ],
         "type" : "object"
       },
       "Me" : {
@@ -171,6 +241,7 @@
             "type" : "string"
           }
         },
+        "required" : [ "admin", "displayName", "id" ],
         "type" : "object"
       },
       "Participant" : {
@@ -187,12 +258,13 @@
             "type" : "string"
           }
         },
+        "required" : [ "player", "registeredAt", "status" ],
         "type" : "object"
       },
       "PlanTournament" : {
         "properties" : {
           "config" : {
-            "$ref" : "#/components/schemas/Config",
+            "$ref" : "#/components/schemas/ConfigRequest",
             "description" : "Optional, ohne Angabe gelten die Standardwerte"
           },
           "date" : {
@@ -219,6 +291,7 @@
             "type" : "string"
           }
         },
+        "required" : [ "displayName", "id" ],
         "type" : "object"
       },
       "RankingEntry" : {
@@ -267,6 +340,7 @@
             "type" : "integer"
           }
         },
+        "required" : [ "draws", "goalDifference", "goalsAgainst", "goalsFor", "losses", "matchesPlayed", "player", "points", "rank", "status", "wins" ],
         "type" : "object"
       },
       "Register" : {
@@ -287,8 +361,11 @@
             "type" : "boolean"
           },
           "enteredBy" : {
-            "$ref" : "#/components/schemas/Player",
-            "type" : "null"
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/Player"
+            }, {
+              "type" : "null"
+            } ]
           },
           "enteredSide" : {
             "enum" : [ "A", "B" ],
@@ -308,6 +385,28 @@
             "type" : [ "string", "null" ]
           }
         },
+        "required" : [ "confirmed", "enteredBy", "enteredSide", "goalsA", "goalsB", "source" ],
+        "type" : "object"
+      },
+      "ResultRequest" : {
+        "description" : "Endstand eines Matches aus Sicht von Team A und Team B",
+        "properties" : {
+          "goalsA" : {
+            "description" : "Tore von Team A",
+            "example" : 10,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "goalsB" : {
+            "description" : "Tore von Team B",
+            "example" : 7,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "goalsA", "goalsB" ],
         "type" : "object"
       },
       "Round" : {
@@ -328,24 +427,32 @@
             "type" : "integer"
           }
         },
+        "required" : [ "complete", "matches", "number" ],
         "type" : "object"
       },
       "Slot" : {
         "properties" : {
           "player" : {
-            "$ref" : "#/components/schemas/Player",
-            "type" : "null"
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/Player"
+            }, {
+              "type" : "null"
+            } ]
           },
           "standIn" : {
-            "$ref" : "#/components/schemas/Player",
             "description" : "Nur bei DUMMY: wer tatsächlich spielt, ohne Punkte zu bekommen",
-            "type" : "null"
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/Player"
+            }, {
+              "type" : "null"
+            } ]
           },
           "type" : {
             "enum" : [ "PLAYER", "DUMMY" ],
             "type" : "string"
           }
         },
+        "required" : [ "player", "standIn", "type" ],
         "type" : "object"
       },
       "Team" : {
@@ -357,6 +464,7 @@
             "type" : "array"
           }
         },
+        "required" : [ "members" ],
         "type" : "object"
       },
       "Tournament" : {
@@ -365,9 +473,12 @@
             "$ref" : "#/components/schemas/Config"
           },
           "currentRound" : {
-            "$ref" : "#/components/schemas/Round",
             "description" : "Die aktuelle Runde, null solange noch keine gestartet wurde",
-            "type" : "null"
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/Round"
+            }, {
+              "type" : "null"
+            } ]
           },
           "date" : {
             "format" : "date",
@@ -395,6 +506,7 @@
             "type" : "string"
           }
         },
+        "required" : [ "config", "currentRound", "date", "id", "name", "participants", "roundCount", "status" ],
         "type" : "object"
       },
       "TournamentSummary" : {
@@ -423,6 +535,7 @@
             "type" : "string"
           }
         },
+        "required" : [ "date", "id", "name", "participantCount", "roundCount", "status" ],
         "type" : "object"
       },
       "UpdateTournament" : {
@@ -1427,7 +1540,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/Config"
+                "$ref" : "#/components/schemas/ConfigRequest"
               }
             }
           },
@@ -3242,7 +3355,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/Result"
+                "$ref" : "#/components/schemas/ResultRequest"
               }
             }
           },
@@ -3420,7 +3533,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/Result"
+                "$ref" : "#/components/schemas/ResultRequest"
               }
             }
           },
