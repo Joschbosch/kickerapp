@@ -92,6 +92,11 @@ final class InMemoryRepositories {
         }
 
         @Override
+        public List<Tournament> findAllByParticipant(PlayerId playerId) {
+            return store.values().stream().filter(t -> t.findParticipant(playerId).isPresent()).toList();
+        }
+
+        @Override
         public void save(Tournament tournament) {
             store.put(tournament.id(), tournament);
         }

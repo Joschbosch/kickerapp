@@ -107,6 +107,34 @@ public final class Responses {
             int draws, int losses, int goalsFor, int goalsAgainst, int goalDifference, int points) {
     }
 
+    @Schema(description = "Die Statistik eines Spielers über alle seine laufenden und beendeten Turniere")
+    public record PlayerStatistics(Player player, StatisticsTotals totals,
+            @Schema(description = "Der Stand in jedem Turnier, neueste zuerst") List<TournamentStanding> tournaments) {
+    }
+
+    @Schema(description = "Summen über alle Turniere des Spielers. Es zählen nur bestätigte Ergebnisse.")
+    public record StatisticsTotals(
+            @Schema(description = "Laufende und beendete Turniere, geplante zählen nicht") int tournamentCount,
+            int finishedTournamentCount,
+            @Schema(description = "Beendete Turniere mit Rang 1 (auch geteilt), in denen der Spieler gespielt hat")
+            int titles,
+            @Schema(description = "Beendete Turniere mit Rang 1 bis 3 (auch geteilt), in denen der Spieler gespielt hat")
+            int podiums,
+            int matchesPlayed, int wins, int draws, int losses, int goalsFor, int goalsAgainst, int goalDifference,
+            int points) {
+    }
+
+    @Schema(description = "Der Stand eines Spielers in einem Turnier: im laufenden Turnier der aktuelle, im "
+            + "beendeten der Endstand")
+    public record TournamentStanding(UUID tournamentId, String name, LocalDate date,
+            TournamentStatus tournamentStatus,
+            @Schema(description = "Ob der Spieler noch dabei ist, pausiert oder ausgeschieden ist")
+            ParticipantStatus participantStatus,
+            int rank, @Schema(description = "Zahl der Teilnehmer, also der Plätze in der Rangliste") int participantCount,
+            int matchesPlayed, int wins, int draws, int losses, int goalsFor, int goalsAgainst, int goalDifference,
+            int points) {
+    }
+
     public record Event(
             @Schema(description = "Kennung des Events. Beim Neuverbinden als Last-Event-ID senden, dann werden verpasste "
                     + "Events nachgeliefert") String id,

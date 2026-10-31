@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import zur.koeln.kickertool.adapter.in.rest.security.SecurityConfiguration;
 import zur.koeln.kickertool.application.port.in.MatchResultUseCase;
 import zur.koeln.kickertool.application.port.in.ParticipationUseCase;
+import zur.koeln.kickertool.application.port.in.PlayerStatisticsQueries;
 import zur.koeln.kickertool.application.port.in.PlayerUseCase;
 import zur.koeln.kickertool.application.port.in.TournamentEventUseCase;
 import zur.koeln.kickertool.application.port.in.TournamentManagementUseCase;
@@ -45,6 +46,8 @@ abstract class ControllerTestBase {
     protected MatchResultUseCase results;
     @MockitoBean
     protected TournamentEventUseCase events;
+    @MockitoBean
+    protected PlayerStatisticsQueries statistics;
     @MockitoBean
     protected JwtDecoder jwtDecoder;
 

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import zur.koeln.kickertool.application.view.TournamentSummary;
+import zur.koeln.kickertool.domain.player.PlayerId;
 import zur.koeln.kickertool.domain.tournament.Tournament;
 import zur.koeln.kickertool.domain.tournament.TournamentId;
 
@@ -20,6 +21,9 @@ public interface TournamentRepository {
     boolean exists(TournamentId id);
 
     List<TournamentSummary> findAllSummaries();
+
+    /** Alle Turniere, in denen der Spieler angemeldet ist (oder war, wenn er ausgeschieden ist). */
+    List<Tournament> findAllByParticipant(PlayerId playerId);
 
     void save(Tournament tournament);
 }

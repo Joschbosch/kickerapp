@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 import zur.koeln.kickertool.application.port.in.MatchResultUseCase;
 import zur.koeln.kickertool.application.port.in.ParticipationUseCase;
+import zur.koeln.kickertool.application.port.in.PlayerStatisticsQueries;
 import zur.koeln.kickertool.application.port.in.PlayerUseCase;
 import zur.koeln.kickertool.application.port.in.TournamentEventUseCase;
 import zur.koeln.kickertool.application.port.in.TournamentManagementUseCase;
@@ -17,6 +18,7 @@ import zur.koeln.kickertool.application.port.out.TournamentRepository;
 import zur.koeln.kickertool.application.service.MatchResultService;
 import zur.koeln.kickertool.application.service.ParticipationService;
 import zur.koeln.kickertool.application.service.PlayerService;
+import zur.koeln.kickertool.application.service.PlayerStatisticsService;
 import zur.koeln.kickertool.application.service.TournamentEventService;
 import zur.koeln.kickertool.application.service.TournamentManagementService;
 import zur.koeln.kickertool.application.service.TournamentQueryService;
@@ -75,6 +77,11 @@ class UseCaseConfiguration {
     @Bean
     TournamentQueries tournamentQueries(TournamentRepository tournaments, PlayerRepository players) {
         return new TournamentQueryService(tournaments, players);
+    }
+
+    @Bean
+    PlayerStatisticsQueries playerStatisticsQueries(PlayerRepository players, TournamentRepository tournaments) {
+        return new PlayerStatisticsService(players, tournaments);
     }
 
     @Bean

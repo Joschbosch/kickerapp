@@ -198,6 +198,31 @@ class JpaRepositoriesTest {
     }
 
     @Test
+    void findsTheTournamentsOfAParticipantWithMatchesAndResults() {
+        Tournament joined = plannedWithPlayers(8, 2);
+        joined.start();
+        joined.startNextRound(strategy, suggester);
+        Match first = joined.rounds().get(0).matches().get(0);
+        joined.decideResult(first.id(), new MatchResult(10, 4), suggester);
+        Tournament other = Tournament.plan(TournamentId.random(), "Anderes Turnier", LocalDate.of(2026, 10, 6),
+                TournamentConfig.defaults());
+        PlayerId outsider = newPlayer("Fremder").id();
+        other.register(outsider, Instant.parse("2026-10-01T10:00:00Z"));
+        PlayerId member = joined.participants().get(0).playerId();
+        tournaments.save(joined);
+        tournaments.save(other);
+        flushAndClear();
+
+        List<Tournament> found = tournaments.findAllByParticipant(member);
+
+        assertThat(found).extracting(Tournament::id).containsExactly(joined.id());
+        assertThat(found.get(0).ranking()).isEqualTo(joined.ranking());
+        assertThat(tournaments.findAllByParticipant(outsider)).extracting(Tournament::id)
+                .containsExactly(other.id());
+        assertThat(tournaments.findAllByParticipant(PlayerId.random())).isEmpty();
+    }
+
+    @Test
     void reportsExistenceAndMissingTournaments() {
         Tournament tournament = plannedWithPlayers(1, 1);
         tournaments.save(tournament);

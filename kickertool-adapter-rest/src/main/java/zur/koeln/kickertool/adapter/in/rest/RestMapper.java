@@ -5,9 +5,12 @@ import java.util.List;
 import zur.koeln.kickertool.adapter.in.rest.dto.Responses;
 import zur.koeln.kickertool.application.Actor;
 import zur.koeln.kickertool.application.event.TournamentEvent;
+import zur.koeln.kickertool.application.view.PlayerStatisticsView;
 import zur.koeln.kickertool.application.view.TournamentSummary;
 import zur.koeln.kickertool.application.view.TournamentView;
 import zur.koeln.kickertool.domain.player.PlayerId;
+import zur.koeln.kickertool.domain.statistics.PlayerStatistics;
+import zur.koeln.kickertool.domain.statistics.TournamentStanding;
 import zur.koeln.kickertool.domain.tournament.DummySlot;
 import zur.koeln.kickertool.domain.tournament.Match;
 import zur.koeln.kickertool.domain.tournament.Participant;
@@ -115,6 +118,21 @@ final class RestMapper {
     private static Responses.RankingEntry rankingEntry(TournamentView view, RankingEntry e) {
         return new Responses.RankingEntry(e.rank(), player(view, e.playerId()), e.status(), e.matchesPlayed(),
                 e.wins(), e.draws(), e.losses(), e.goalsFor(), e.goalsAgainst(), e.goalDifference(), e.points());
+    }
+
+    static Responses.PlayerStatistics statistics(PlayerStatisticsView view) {
+        PlayerStatistics.Totals t = view.statistics().totals();
+        return new Responses.PlayerStatistics(player(view.player()),
+                new Responses.StatisticsTotals(t.tournamentCount(), t.finishedTournamentCount(), t.titles(),
+                        t.podiums(), t.matchesPlayed(), t.wins(), t.draws(), t.losses(), t.goalsFor(),
+                        t.goalsAgainst(), t.goalDifference(), t.points()),
+                view.statistics().tournaments().stream().map(RestMapper::standing).toList());
+    }
+
+    private static Responses.TournamentStanding standing(TournamentStanding s) {
+        return new Responses.TournamentStanding(s.tournamentId().value(), s.name(), s.date(), s.tournamentStatus(),
+                s.participantStatus(), s.rank(), s.participantCount(), s.matchesPlayed(), s.wins(), s.draws(),
+                s.losses(), s.goalsFor(), s.goalsAgainst(), s.goalDifference(), s.points());
     }
 
     static Responses.Event event(TournamentEvent event) {

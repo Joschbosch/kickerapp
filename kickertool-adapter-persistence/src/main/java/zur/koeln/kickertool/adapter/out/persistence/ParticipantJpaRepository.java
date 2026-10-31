@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 interface ParticipantJpaRepository extends JpaRepository<ParticipantEntity, ParticipantKey> {
 
     List<ParticipantEntity> findByTournamentId(UUID tournamentId);
+
+    List<ParticipantEntity> findByPlayerId(UUID playerId);
 }

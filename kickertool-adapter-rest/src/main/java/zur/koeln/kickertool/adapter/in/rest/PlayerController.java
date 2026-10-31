@@ -3,14 +3,17 @@ package zur.koeln.kickertool.adapter.in.rest;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import zur.koeln.kickertool.adapter.in.rest.dto.Responses;
 import zur.koeln.kickertool.application.Actor;
+import zur.koeln.kickertool.application.port.in.PlayerStatisticsQueries;
 import zur.koeln.kickertool.application.port.in.PlayerUseCase;
 import zur.koeln.kickertool.domain.player.Player;
 
@@ -20,9 +23,11 @@ import zur.koeln.kickertool.domain.player.Player;
 class PlayerController {
 
     private final PlayerUseCase players;
+    private final PlayerStatisticsQueries statistics;
 
-    PlayerController(PlayerUseCase players) {
+    PlayerController(PlayerUseCase players, PlayerStatisticsQueries statistics) {
         this.players = players;
+        this.statistics = statistics;
     }
 
     @Operation(summary = "Eigenes Profil",
@@ -32,6 +37,17 @@ class PlayerController {
     Responses.Me me(Actor actor) {
         Player player = players.getPlayer(actor.playerId());
         return new Responses.Me(player.id().value(), player.displayName(), actor.admin());
+    }
+
+    @Operation(summary = "Statistik eines Spielers",
+            description = "Die Statistik über alle laufenden und beendeten Turniere des Spielers: Summen (Turniere, "
+                    + "Spiele, Siege, Tore, Punkte, Titel) und der Stand in jedem Turnier. Jeder angemeldete Spieler "
+                    + "darf die Statistik jedes Spielers sehen. Geplante Turniere zählen nicht, Ergebnisse nur "
+                    + "bestätigt. Für die eigene Statistik kann `me` als ID stehen.")
+    @GetMapping("/players/{playerId}/statistics")
+    Responses.PlayerStatistics statistics(Actor actor,
+            @Parameter(description = PathPlayer.HELP) @PathVariable String playerId) {
+        return RestMapper.statistics(statistics.statistics(PathPlayer.resolve(playerId, actor)));
     }
 
     @Operation(summary = "Alle bekannten Spieler",

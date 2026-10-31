@@ -99,6 +99,7 @@ Hier die Zuordnung zu Bildschirmen:
 | Bildschirm | Endpunkte |
 |---|---|
 | Start, Profil | `GET /api/me` |
+| Statistik | `GET /api/players/{id}/statistics` (auch `me`): Summen über alle Turniere und der Stand je Turnier, für jeden Spieler abrufbar |
 | Turnierliste | `GET /api/tournaments` |
 | Turnier, Anmeldung | `GET /api/tournaments/{id}`, `POST …/participants`, `DELETE …/participants/me`, `PUT …/participants/me/status` |
 | Mein Spiel | `GET …/matches/mine` (alle Matches des Aufrufers, auch als Einspringer) |

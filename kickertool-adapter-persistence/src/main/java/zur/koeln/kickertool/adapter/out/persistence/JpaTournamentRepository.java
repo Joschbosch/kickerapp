@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import zur.koeln.kickertool.application.port.out.TournamentRepository;
 import zur.koeln.kickertool.application.view.TournamentSummary;
+import zur.koeln.kickertool.domain.player.PlayerId;
 import zur.koeln.kickertool.domain.tournament.Match;
 import zur.koeln.kickertool.domain.tournament.Participant;
 import zur.koeln.kickertool.domain.tournament.Round;
@@ -58,6 +59,13 @@ class JpaTournamentRepository implements TournamentRepository {
                 .map(row -> new TournamentSummary(new TournamentId(row.id()), row.name(), row.date(), row.status(),
                         (int) row.participantCount(), row.roundCount()))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Tournament> findAllByParticipant(PlayerId playerId) {
+        List<UUID> ids = participants.findByPlayerId(playerId.value()).stream().map(p -> p.tournamentId).toList();
+        return tournaments.findAllById(ids).stream().map(this::assemble).toList();
     }
 
     @Override

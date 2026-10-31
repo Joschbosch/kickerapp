@@ -34,9 +34,6 @@ import zur.koeln.kickertool.domain.tournament.TournamentId;
 @Tag(name = "Teilnahme", description = "Anmeldung, Pause und Ausscheiden. Spieler verwalten nur sich selbst, Admins jeden.")
 class ParticipantController {
 
-    private static final String ME = "me";
-    private static final String PLAYER_ID_HELP = "Spieler-ID oder `me` für den Aufrufer";
-
     private final ParticipationUseCase participation;
 
     ParticipantController(ParticipationUseCase participation) {
@@ -60,9 +57,10 @@ class ParticipantController {
     @Operation(summary = "Vom Turnier abmelden", description = "Nur vor dem Start. Danach gibt es nur Pause oder Ausscheiden.")
     @DeleteMapping("/{playerId}")
     Responses.Tournament unregister(Actor actor, @PathVariable UUID tournamentId,
-            @Parameter(description = PLAYER_ID_HELP) @PathVariable String playerId) {
+            @Parameter(description = PathPlayer.HELP) @PathVariable String playerId) {
         return RestMapper.tournament(
-                participation.unregister(actor, new TournamentId(tournamentId), resolve(playerId, actor)), actor);
+                participation.unregister(actor, new TournamentId(tournamentId), PathPlayer.resolve(playerId, actor)),
+                actor);
     }
 
     @Operation(summary = "Teilnahmestatus ändern",
@@ -71,19 +69,15 @@ class ParticipantController {
                     + "erhalten, eine Rückkehr ist nicht möglich.")
     @PutMapping("/{playerId}/status")
     Responses.Tournament changeStatus(Actor actor, @PathVariable UUID tournamentId,
-            @Parameter(description = PLAYER_ID_HELP) @PathVariable String playerId,
+            @Parameter(description = PathPlayer.HELP) @PathVariable String playerId,
             @Valid @RequestBody Requests.ChangeParticipantStatus request) {
         TournamentId tournament = new TournamentId(tournamentId);
-        PlayerId player = resolve(playerId, actor);
+        PlayerId player = PathPlayer.resolve(playerId, actor);
         TournamentView view = switch (request.status()) {
             case PAUSED -> participation.pause(actor, tournament, player);
             case ACTIVE -> participation.resume(actor, tournament, player);
             case WITHDRAWN -> participation.withdraw(actor, tournament, player);
         };
         return RestMapper.tournament(view, actor);
-    }
-
-    private static PlayerId resolve(String value, Actor actor) {
-        return ME.equals(value) ? actor.playerId() : PlayerId.of(value);
     }
 }

@@ -19,9 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import zur.koeln.kickertool.application.ForbiddenException;
+import zur.koeln.kickertool.application.view.PlayerStatisticsView;
+import zur.koeln.kickertool.domain.NotFoundException;
 import zur.koeln.kickertool.domain.RuleViolationException;
 import zur.koeln.kickertool.domain.player.Player;
 import zur.koeln.kickertool.domain.player.PlayerId;
+import zur.koeln.kickertool.domain.statistics.PlayerStatistics;
 import zur.koeln.kickertool.domain.tournament.TournamentId;
 
 class ParticipantAndPlayerControllerTest extends ControllerTestBase {
@@ -135,6 +138,64 @@ class ParticipantAndPlayerControllerTest extends ControllerTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[1].displayName").value("Ben"));
+    }
+
+    @Test
+    void anyPlayerCanReadTheStatisticOfAnyPlayer() throws Exception {
+        Player ben = new Player(PlayerId.random(), "sub-ben", "Ben");
+        when(statistics.statistics(ben.id())).thenReturn(new PlayerStatisticsView(ben,
+                PlayerStatistics.of(ben.id(), List.of(data.tournament()))));
+        PlayerId inTournament = data.players().get(0).id();
+        when(statistics.statistics(inTournament)).thenReturn(new PlayerStatisticsView(data.players().get(0),
+                PlayerStatistics.of(inTournament, List.of(data.tournament()))));
+
+        mvc.perform(get("/api/players/" + ben.id() + "/statistics").with(user()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.player.displayName").value("Ben"))
+                .andExpect(jsonPath("$.totals.tournamentCount").value(0))
+                .andExpect(jsonPath("$.tournaments", hasSize(0)));
+
+        mvc.perform(get("/api/players/" + inTournament + "/statistics").with(user()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.player.displayName").value("Spieler 1"))
+                .andExpect(jsonPath("$.totals.tournamentCount").value(1))
+                .andExpect(jsonPath("$.totals.finishedTournamentCount").value(0))
+                .andExpect(jsonPath("$.tournaments", hasSize(1)))
+                .andExpect(jsonPath("$.tournaments[0].name").value("Herbstturnier"))
+                .andExpect(jsonPath("$.tournaments[0].tournamentStatus").value("RUNNING"))
+                .andExpect(jsonPath("$.tournaments[0].participantStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.tournaments[0].participantCount").value(10))
+                .andExpect(jsonPath("$.tournaments[0].rank").value(1));
+    }
+
+    @Test
+    void meStandsForTheCallerInTheStatisticPath() throws Exception {
+        when(statistics.statistics(ANNA.id())).thenReturn(new PlayerStatisticsView(ANNA,
+                PlayerStatistics.of(ANNA.id(), List.of())));
+
+        mvc.perform(get("/api/players/me/statistics").with(user()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.player.id").value(ANNA.id().toString()))
+                .andExpect(jsonPath("$.player.displayName").value("Anna"));
+    }
+
+    @Test
+    void statisticOfAnUnknownPlayerIsNotFound() throws Exception {
+        PlayerId unknown = PlayerId.random();
+        when(statistics.statistics(unknown)).thenThrow(new NotFoundException("Spieler nicht gefunden"));
+
+        mvc.perform(get("/api/players/" + unknown + "/statistics").with(user()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void statisticRequiresLogin() throws Exception {
+        mvc.perform(get("/api/players/" + UUID.randomUUID() + "/statistics")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void statisticWithAMalformedPlayerIdIsBadRequest() throws Exception {
+        mvc.perform(get("/api/players/kein-uuid/statistics").with(user())).andExpect(status().isBadRequest());
     }
 
     @Test

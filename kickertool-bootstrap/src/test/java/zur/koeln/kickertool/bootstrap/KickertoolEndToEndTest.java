@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
@@ -291,6 +292,25 @@ class KickertoolEndToEndTest {
             assertThat(post(tournament + "/finish", adminToken, null).status()).isEqualTo(200);
             assertThat(get(tournament, adminToken).obj().get("status")).isEqualTo("FINISHED");
             assertThat(get("/api/tournaments", adminToken).list()).hasSize(1);
+
+            // Statistik: jeder Spieler sieht die jedes anderen, der Pausierte hat ein Spiel weniger
+            Response statistics = get("/api/players/" + users.get(0).id() + "/statistics", users.get(5).token());
+            assertThat(statistics.status()).isEqualTo(200);
+            assertThat(((Map<?, ?>) statistics.obj().get("player")).get("displayName")).isEqualTo("Spieler 1");
+            Map<?, ?> totals = (Map<?, ?>) statistics.obj().get("totals");
+            assertThat(totals.get("tournamentCount")).isEqualTo(1);
+            assertThat(totals.get("finishedTournamentCount")).isEqualTo(1);
+            assertThat(totals.get("matchesPlayed")).isEqualTo(3);
+            assertThat((List<?>) statistics.obj().get("tournaments")).hasSize(1);
+            Map<?, ?> standing = (Map<?, ?>) ((List<?>) statistics.obj().get("tournaments")).get(0);
+            assertThat(standing.get("name")).isEqualTo("E2E-Turnier");
+            assertThat(standing.get("tournamentStatus")).isEqualTo("FINISHED");
+            assertThat(standing.get("participantCount")).isEqualTo(10);
+            Response pausedStatistics = get("/api/players/me/statistics", pausing.token());
+            assertThat(((Map<?, ?>) pausedStatistics.obj().get("totals")).get("matchesPlayed")).isEqualTo(2);
+            assertThat(get("/api/players/" + users.get(0).id() + "/statistics", null).status()).isEqualTo(401);
+            assertThat(get("/api/players/" + UUID.randomUUID() + "/statistics", adminToken).status())
+                    .isEqualTo(404);
 
             // Live-Updates sind angekommen
             long deadline = System.currentTimeMillis() + 5_000;

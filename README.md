@@ -19,6 +19,7 @@ Spring Boot 4.1, Java 21, hexagonale Architektur, Anmeldung über einen beliebig
 8. **Wertung (Einzelwertung):** Sieg 3, Unentschieden 1, Niederlage 0 Punkte, alles konfigurierbar. Sortierung: Punkte, dann Tordifferenz, dann erzielte Tore. Spieler mit identischen Werten teilen sich den Rang. Pro Spieler: Rang, Punkte, Spiele, Siege, Unentschieden, Niederlagen, Tore, Gegentore, Tordifferenz. Es zählen nur bestätigte Ergebnisse.
 9. **Pause und Ausscheiden:** Pausieren wirkt ab der nächsten Runde (die laufende wird normal beendet), Wiedereinstieg ist möglich. Ausgeschiedene sind als `WITHDRAWN` markiert, behalten ihre Punkte und kommen nicht zurück.
 10. Die Rundenzahl ist offen (`plannedRounds` ist nur eine Anzeige). Der Admin beendet das Turnier.
+11. **Statistik pro Spieler:** Über alle Turniere, an denen ein Spieler teilnimmt, summiert das System Turniere, Spiele, Siege, Unentschieden, Niederlagen, Tore, Gegentore und Punkte und listet den Stand in jedem Turnier (Rang, Teilnehmerzahl, Zahlen). Es zählen laufende und beendete Turniere, geplante nicht. Die Werte stammen aus der Rangliste des Turniers, also nur bestätigte Ergebnisse und ohne Spiele als Einspringer. Als **Titel** zählt Rang 1, als **Podestplatz** Rang 1 bis 3, jeweils nur in beendeten Turnieren, in denen der Spieler gespielt hat (geteilte Ränge zählen mit). Jeder angemeldete Spieler darf die Statistik jedes Spielers sehen. Eine Gesamtrangliste über alle Spieler gibt es nicht.
 
 ## Architektur
 
@@ -185,6 +186,7 @@ Als Spieler-ID kann überall `me` stehen.
 |---|---|---|
 | `GET /api/me` | alle | eigenes Profil (legt den Spieler beim ersten Aufruf an), `admin`-Flag |
 | `GET /api/players` | Admin | alle bekannten Spieler |
+| `GET /api/players/{playerId}/statistics` | alle | Statistik eines Spielers über alle laufenden und beendeten Turniere: Summen (Turniere, Spiele, Siege, Tore, Punkte, Titel, Podestplätze) und der Stand in jedem Turnier. Jeder darf jede Statistik sehen |
 | `GET /api/tournaments` | alle | Turnierliste |
 | `POST /api/tournaments` | Admin | Turnier planen (`name`, `date`, optional `config`) |
 | `GET /api/tournaments/{id}` | alle | Turnier mit Konfiguration, Teilnehmern, aktueller Runde |
